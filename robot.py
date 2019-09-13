@@ -21,11 +21,18 @@ class Robot:
             self.laser_sub = rospy.Subscriber('/scan', LaserScan, callback=self.laser_callback)
             self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
             self.imu_sub =  rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
+
             self.vel_msg = Twist()
             self.laser_msg = LaserScan()
             self.odom_msg = Odometry()
             self.imu_msg = Imu()
 
+            self.
+
+        def laser_callback(self, msg):
+
+        def odom_callback(self, msg):
+        def imu_callback(self, msg):
         def drive_straight(self, speed, distance):
             """
             Make the robot drive straight
