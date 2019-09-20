@@ -5,12 +5,15 @@ import tf
 from tf.transformations import euler_from_quaternion
 import math
 import copy
+import numpy as np
+import time
 
 from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import Odometry, Path, OccupancyGrid, GridCells
 from std_msgs.msg import Bool
 from sensor_msg.msg import Imu, LaserScan
+from scipy import integrate
 
 class Robot:
         def __init__(self):
@@ -27,7 +30,9 @@ class Robot:
             self.odom_msg = Odometry()
             self.imu_msg = Imu()
 
-            self.
+            self.odom_pose = Pose()
+
+
 
         def laser_callback(self, msg):
 
@@ -177,3 +182,60 @@ class Robot:
 
             self.vel_msg.angular.z = 0
             self.vel_pub.publish(self.vel_msg)
+        def move_s(self, input_x, input_y, dt):
+            """
+            Rotate in place
+            :param input_x: distance in x to drive
+            :param input_y: distance in y to drive
+            :param dt: time step for movement
+            :return:
+            """
+            #ROS Imputs
+            tbot_x = self.odom_pose.position.x
+            tbot_y = self.odom_pose.position.y
+            #Calculating Curve Parameters
+            theta = 0
+            angles = tf.transformations.euler_from_quaternion(
+                [self.odom_pose.orientation.x,
+                 self.odom_pose.orientation.y,
+                 self.odom_pose.orientation.z,
+                 self.odom_pose.orientation.w])
+            if input_x>0
+                actangle = math.atan(input_y/input_x)
+            else
+                if input_y>0
+                    actangle = math.atan(input_y/input_x)+math.pi
+                else
+                    actangle = math.atan(input_y/input_x)-math.pi
+            theta0 = angles[0]
+            if actangle > theta0
+                theta1 = theta0+2*actangle
+            else
+                theta1 = theta0-2*actangle
+
+            a0 = tbot_x
+            a1 = 2 * (math.tan(theta1) * input_x - input_y) / (math.tan(theta1) - math.tan(theta0))
+            a2 = input_x - a1
+            b0 = tbot_y
+            b1 = a1 * math.tan(theta0)
+            b2 = input_y - b1
+
+            A = 4 * math.pow(a2,2) + 4 * math.pow(b2,2)
+            B = 4 * a1 * a2 + 4 * b1 * b2
+            C = math.pow(a1,2) + b1 ^ 2
+
+            #foo = sqrt(A*math.pow(x,2)+B*x+C) Need to figure out quadratic
+            x2 = lambda x: sqrt(A*math.pow(x,2)+B*x+C)
+            dl_hat = integrate.quad(x2, 0, 1)
+
+            #Movement
+            theta = actangle-angles[0]
+            self.vel_msg.linear.X = dl_hat
+            self.vel_msg.angular.Z = 2*theta
+            self.vel_pub.publish(self.vel_msg)
+            '''
+            t = time.time()
+            while time.time() - t < dt
+                tbot_x = self.odom_pose.position.x
+                tbot_y = self.odom_pose.position.y
+            ''' 
