@@ -1,5 +1,22 @@
 import numpy as np
-#import rospy
+import rospy
+import roslib
+import tf
+from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
+from nav_msgs.msg import Odometry
+from sensor_msg.msg import Imu
+#Done as a node itself
+
+class pid_controller:
+    def __init__(self):
+        print("Creating PID Controller Node")
+        rospy.init_node('PID Controller')
+        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2)
+        self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
+        self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
+        self.scan_sub = rospy.Subscriber('/scan', LaserScan, callback=self.scan_callback)
+
+
 T = 100;
 num_steps = 100;
 n = 3;
@@ -154,14 +171,7 @@ Sigma_x_p = np.zeros((n,n));
 
 error = np.zeros((1,num_steps));
 cost = np.zeros((1,num_steps));
-# ---------ROS STUFF-------------
-# robot = rospublisher('/cmd_vel');
-# laser = rossubscriber('/scan');
-# imu = rossubscriber('/imu');
-# odom = rossubscriber('/odom');
-# stmsg = rosmessage(odom);
-# msg = rosmessage(robot);
-#---------ROS STUFF-------------
+
 
 finish = False;
 # set(gcf,'CurrentCharacter','@'); % set to a dummy character
@@ -205,3 +215,10 @@ print(omega)
 # msg.Angular.Z = omega;
 # msg.Linear.X = Xi;
 # send(robot,msg);
+
+if __name__ == "   main   ":
+    try:
+        pid_controller()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass
