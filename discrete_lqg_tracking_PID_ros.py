@@ -17,13 +17,15 @@ class pid_controller:
         self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
         self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
         self.scan_sub = rospy.Subscriber('/scan', LaserScan, callback=self.scan_callback)
-		self.odom = Odometry()
-		self.pose = Pose()
-		self.twist = Twist()
+        self.odom = Odometry()
+        self.pose = Pose()
+        self.twist = Twist()
 
-def odom_callback(self, msg):
-def imu_callback(self, msg):
-def scan_callback(self, msg):
+# def odom_callback(self, msg):
+#
+# def imu_callback(self, msg):
+#
+# def scan_callback(self, msg)
 
 def controller_init(self):
     print("Initializing Controller...")
@@ -221,34 +223,36 @@ def controller_init(self):
         omega = 0.3
     elif omega < -0.3:
         omega = -0.3
-	twist_msg.linear.x = Xi
-	twist_msg.angular.z = omega
+    twist_msg.linear.x = Xi
+    twist_msg.angular.z = omega
     self.vel_pub.publish(twist_msg)
 # Odom
 def pid_loop(self, msg):
 	#Takes in Odom message
      for i in range(1, num_steps):
-    	 tbot_x = msg.pose.pose.position.x
-		 tbot_y = msg.pose.pose.position.y
+         tbot_x = msg.pose.pose.position.x
+         tbot_y = msg.pose.pose.position.y
          quat = msg.pose.pose.orientation;
          angles = euler_from_quaternion(quat)
-         y[:,i] = [tbot_x; tbot_y; angles[0]];
+         y[:,i] = [tbot_x, tbot_y, angles[0]];
          x_temp = A*x_hat[:,i-1] + B*u[:,i-1];
-         x_hat(:,i) = x_temp + Theta[:,:,i]*(y[:,i]-C*x_temp);
-         B = np.array([[np.cos(y[2,i]),0],
-                      [np.sin(y[2,i]),0],
-                      [0,1]]
+         x_hat[:,i] = x_temp + Theta[:,:,i]*(y[:,i]-C*x_temp);
+
+         B = np.array([[np.cos(y[2,i]),0],[np.sin(y[2,i]),0],[0,1]])
          u[0,i] = ref_traj_db_dot[0,i] + kp1*(ref_traj[0,i]-y[0,i]) + kd1*(ref_traj_dot[0,i]-y[0,i]+y[0,i-1]);
          u[1,i] = ref_traj_db_dot[1,i] + kp2*(ref_traj[1,i]-y[1,i]) + kd2*(ref_traj_dot[1,i]-y[1,i]+y[1,i-1]);
-		 Xi = u[0,0]*np.cos(y[2,0])*dt+u[1,0]*np.sin(y[2,0])*dt
-    	 omega = (u[1,0]*np.cos(y[2,0])-u[0,0]*np.sin(y[2,0]))/Xi
-    	 if omega > 0.3:
-       	 	omega = 0.3
-    	 elif omega < -0.3:
-       	 	omega = -0.3
-    	 twist_msg.linear.x = Xi
-		 twist_msg.angular.z = omega
-	     self.vel_pub.publish(twist_msg)
+         Xi = u[0,i]*np.cos(y[2,i])*dt+u[1,i]*np.sin(y[2,i])*dt
+         omega = (u[1,i]*np.cos(y[2,i])-u[0,i]*np.sin(y[2,i]))/Xi
+         if omega > 0.3:
+             omega = 0.3
+         elif omega < -0.3:
+             omega = -0.3
+         if y[2,i] > math.pi or y[2,i] < -math.pi:
+             y[2,i] = y[2,i] - 2*math.pi*np.sign(y[2,i]);
+         error[i] = (np.linalg.norm(y[0:2,i] - ref_traj[0:2,i]))^2/2
+         twist_msg.linear.x = Xi
+         twist_msg.angular.z = omega
+         self.vel_pub.publish(twist_msg)
 
 if __name__ == "   main   ":
     try:
