@@ -184,7 +184,7 @@ class Robot:
             self.vel_pub.publish(self.vel_msg)
         def move_s(self, input_x, input_y, dt):
             """
-            Rotate in place
+            Move a given distance in x and y for a specific time step
             :param input_x: distance in x to drive
             :param input_y: distance in y to drive
             :param dt: time step for movement
@@ -239,3 +239,9 @@ class Robot:
                 tbot_x = self.odom_pose.position.x
                 tbot_y = self.odom_pose.position.y
             '''
+if __name__ == "__main__":
+    try:
+        turtlebot = Robot()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass
