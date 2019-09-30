@@ -250,14 +250,7 @@ cost = zeros(1,num_steps);
 
 
 
-% %% turtlebot
-% % rosinit;
-% robot = rospublisher('/cmd_vel');
-% laser = rossubscriber('/scan');
-% imu = rossubscriber('/imu');
-% odom = rossubscriber('/odom');
-% stmsg = rosmessage(odom);
-% msg = rosmessage(robot);
+
 
 %% State receive
 
