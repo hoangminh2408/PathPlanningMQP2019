@@ -33,11 +33,14 @@ class Robot:
             self.odom_pose = Pose()
 
 
-
+        def odom_callback(self,msg):
+            self.odom_msg = msg
         def laser_callback(self, msg):
-
+            self.laser_msg = msg
         def odom_callback(self, msg):
+            self.odom_msg = msg
         def imu_callback(self, msg):
+            self.imu_msg = msg
         def drive_straight(self, speed, distance):
             """
             Make the robot drive straight
