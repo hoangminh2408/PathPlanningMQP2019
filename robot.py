@@ -20,6 +20,7 @@ class Robot:
             ''''''
             Setup Node here
             ''''''
+            rospy.init_node('pathplanningmqp_robot', anonymous=True)
             self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=2)
             self.laser_sub = rospy.Subscriber('/scan', LaserScan, callback=self.laser_callback)
             self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
@@ -31,7 +32,7 @@ class Robot:
             self.imu_msg = Imu()
 
             self.odom_pose = Pose()
-
+            print("Robot.py Initialized")
 
         def odom_callback(self,msg):
             self.odom_msg = msg

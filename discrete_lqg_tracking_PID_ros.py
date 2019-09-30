@@ -13,7 +13,7 @@ from tf.transformations import euler_from_quaternion
 class pid_controller:
     def __init__(self):
         print("Creating PID Controller Node")
-        rospy.init_node('PID Controller')
+        rospy.init_node('PID_Controller')
         self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2)
         self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
         self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)

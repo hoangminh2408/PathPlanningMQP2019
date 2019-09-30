@@ -1,0 +1,5 @@
+<launch>
+    <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger]"/>
+    <node name="PID_Controller" pkg="CHANGETHIS" type="discrete_lqg_tracking_PID_ros.py" output="screen" />
+    <node name="map_exploder" pkg="CHANGETHIS" type="map_exploder.py" output="screen" />
+</launch>
