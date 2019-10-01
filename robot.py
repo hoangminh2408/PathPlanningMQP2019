@@ -7,24 +7,42 @@ import math
 import copy
 import numpy as np
 import time
+import sys, select, os
+if os.name == 'nt':
+  import msvcrt
+else:
+  import tty, termios
 
 from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import Odometry, Path, OccupancyGrid, GridCells
 from std_msgs.msg import Bool
-from sensor_msg.msg import Imu, LaserScan
+from sensor_msgs.msg import Imu, LaserScan
 from scipy import integrate
+
+def getKey():
+    if os.name == 'nt':
+      return msvcrt.getch()
+
+    tty.setraw(sys.stdin.fileno())
+    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+    if rlist:
+        key = sys.stdin.read(1)
+    else:
+        key = ''
+
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
+    return key
 
 class Robot:
         def __init__(self):
-            ''''''
-            Setup Node here
-            ''''''
+            #Setup Node here
             rospy.init_node('pathplanningmqp_robot', anonymous=True)
             self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=2)
             self.laser_sub = rospy.Subscriber('/scan', LaserScan, callback=self.laser_callback)
             self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
             self.imu_sub =  rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
+            self.vel_sub = rospy.Subscriber('/cmd_vel', Twist, callback=self.cmd_vel_callback)
 
             self.vel_msg = Twist()
             self.laser_msg = LaserScan()
@@ -34,6 +52,8 @@ class Robot:
             self.odom_pose = Pose()
             print("Robot.py Initialized")
 
+        def cmd_vel_callback(self,msg):
+            self.vel_msg = msg
         def odom_callback(self,msg):
             self.odom_msg = msg
         def laser_callback(self, msg):
@@ -42,6 +62,7 @@ class Robot:
             self.odom_msg = msg
         def imu_callback(self, msg):
             self.imu_msg = msg
+
         def drive_straight(self, speed, distance):
             """
             Make the robot drive straight
@@ -55,15 +76,14 @@ class Robot:
             self.vel_msg.angular.x = 0
             self.vel_msg.angular.y = 0
             self.vel_msg.angular.z = 0
-
             # set forward velocity
             self.vel_msg.linear.x = math.copysign(speed, distance)
             self.vel_msg.linear.y = 0
             self.vel_msg.linear.z = 0
 
             # wait for odom
-            while not self.odom_ready:
-                pass
+            # while not self.odom_ready:
+            #     pass
 
             # store start location
             pose_start = self.odom_pose
@@ -71,16 +91,16 @@ class Robot:
             keep_driving = True
             slow_down = False
             slow_way_down = False
-            if self.calc_distance(pose_start) > (abs(distance) * 0.8):
-                slow_down = True
-            if self.calc_distance(pose_start) > (abs(distance) * 0.95):
-                slow_way_down = True
+            # if self.calc_distance(pose_start) > (abs(distance) * 0.8):
+            #     slow_down = True
+            # if self.calc_distance(pose_start) > (abs(distance) * 0.95):
+            #     slow_way_down = True
             '''
             Capacity to move at different speeds for testing
             '''
             while keep_driving and not rospy.is_shutdown():
-                if self.stop_nav:
-                    break
+                # if self.stop_nav:
+                #     break
                 if slow_way_down:
                     # print("slowing linear a lot")
                     self.vel_msg.linear.x = math.copysign(speed, distance) * 0.2
@@ -89,103 +109,16 @@ class Robot:
                     self.vel_msg.linear.x = math.copysign(speed, distance) * 0.5
 
                 self.vel_pub.publish(self.vel_msg)
-                keep_driving = self.calc_distance(pose_start) < abs(distance)
-                if self.calc_distance(pose_start) > (abs(distance) * 0.8):
-                    slow_down = True
-                if self.calc_distance(pose_start) > (abs(distance) * 0.95):
-                    slow_way_down = True
+                # keep_driving = self.calc_distance(pose_start) < abs(distance)
+                # if self.calc_distance(pose_start) > (abs(distance) * 0.8):
+                #     slow_down = True
+                # if self.calc_distance(pose_start) > (abs(distance) * 0.95):
+                #     slow_way_down = True
 
             self.vel_msg.linear.x = 0
             self.vel_pub.publish(self.vel_msg)
 
-        def rotate(self, angle):
-            """
-            Rotate in place
-            :param angle: angle to rotate
-            :return:
-            """
-            print("Rotating " + str(angle))
-            # zero linear velocity
-            self.vel_msg.linear.x = 0
-            self.vel_msg.linear.y = 0
-            self.vel_msg.linear.z = 0
 
-            # set angular values
-            self.vel_msg.angular.x = 0
-            self.vel_msg.angular.y = 0
-            self.vel_msg.angular.z = math.pi / 10
-
-            # wait for odom
-            while not self.odom_ready:
-                pass
-
-            # don't turn the long way
-            # find out what range the half circle to our right is
-            theta0 = self.get_yaw()
-            theta1 = self.get_yaw() - math.pi
-            wrap = False
-
-            if theta1 <= (-1 * math.pi):
-                # we wrap around going right, determine how to check if the yaw is in range
-                theta1 = theta1 + (2 * math.pi)
-                wrap = True
-
-            if wrap:
-                if theta0 >= angle or angle >= theta1:
-                    self.vel_msg.angular.z *= -1
-            else:
-                if theta0 >= angle >= theta1:
-                    self.vel_msg.angular.z *= -1
-
-            yaw = self.get_yaw()
-            turn_sign = math.copysign(1, (angle - yaw))
-
-            stop_turn = False
-            slow_down = False
-            slow_way_down = False
-            prev_sign = math.copysign(1, (angle - yaw))
-            now_sign = math.copysign(1, (angle - yaw))
-            prev_yaw = copy.deepcopy(yaw)
-            now_yaw = copy.deepcopy(yaw)
-            stop_turn = now_sign != prev_sign or abs(prev_yaw - now_yaw) > (2 * math.pi - 0.1) or abs(
-                angle - yaw) < 0.05
-            slow_down = abs(angle - yaw) < 0.3
-            slow_way_down = abs(angle - yaw) < 0.1
-            while not stop_turn and not rospy.is_shutdown():
-                if self.stop_nav:
-                    break
-                # print(angle-yaw)
-                if slow_way_down:
-                    self.vel_msg.angular.z = math.pi / 60
-                    if wrap:
-                        if theta0 >= angle or angle >= theta1:
-                            self.vel_msg.angular.z *= -1
-                    else:
-                        if theta0 >= angle >= theta1:
-                            self.vel_msg.angular.z *= -1
-                    # print("slowing turning a lot")
-                elif slow_down:
-                    self.vel_msg.angular.z = math.pi / 20
-                    if wrap:
-                        if theta0 >= angle or angle >= theta1:
-                            self.vel_msg.angular.z *= -1
-                    else:
-                        if theta0 >= angle >= theta1:
-                            self.vel_msg.angular.z *= -1
-                    # print("slowing turning a bit")
-
-                self.vel_pub.publish(self.vel_msg)
-                yaw = self.get_yaw()
-                slow_down = abs(angle - yaw) < 0.3
-                slow_way_down = abs(angle - yaw) < 0.1
-                prev_sign = copy.deepcopy(now_sign)
-                now_sign = math.copysign(1, (angle - yaw))
-                prev_yaw = copy.deepcopy(now_yaw)
-                now_yaw = copy.deepcopy(yaw)
-                stop_turn = now_sign != prev_sign or abs(prev_yaw - now_yaw) > (2 * math.pi - 0.1)
-
-            self.vel_msg.angular.z = 0
-            self.vel_pub.publish(self.vel_msg)
         def move_s(self, input_x, input_y, dt):
             """
             Move a given distance in x and y for a specific time step
@@ -197,6 +130,7 @@ class Robot:
             #ROS Imputs
             tbot_x = self.odom_pose.position.x
             tbot_y = self.odom_pose.position.y
+            print(tbot_x)
             #Calculating Curve Parameters
             theta = 0
             angles = tf.transformations.euler_from_quaternion(
@@ -204,17 +138,17 @@ class Robot:
                  self.odom_pose.orientation.y,
                  self.odom_pose.orientation.z,
                  self.odom_pose.orientation.w])
-            if input_x>0
+            if input_x>0:
                 actangle = math.atan(input_y/input_x)
-            else
-                if input_y>0
+            else:
+                if input_y>0:
                     actangle = math.atan(input_y/input_x)+math.pi
-                else
+                else:
                     actangle = math.atan(input_y/input_x)-math.pi
             theta0 = angles[0]
-            if actangle > theta0
+            if actangle > theta0:
                 theta1 = theta0+2*actangle
-            else
+            else:
                 theta1 = theta0-2*actangle
 
             a0 = tbot_x
@@ -226,26 +160,41 @@ class Robot:
 
             A = 4 * math.pow(a2,2) + 4 * math.pow(b2,2)
             B = 4 * a1 * a2 + 4 * b1 * b2
-            C = math.pow(a1,2) + b1 ^ 2
+            C = math.pow(a1,2) + math.pow(b1,2)
 
-            #foo = sqrt(A*math.pow(x,2)+B*x+C) Need to figure out quadratic
-            x2 = lambda x: sqrt(A*math.pow(x,2)+B*x+C)
-            dl_hat = integrate.quad(x2, 0, 1)
+
+            x2 = lambda x: math.sqrt(A*math.pow(x,2)+B*x+C)
+            [dl_hat, err] = integrate.quad(x2, 0, 1)
+            print(dl_hat)
 
             #Movement
             theta = actangle-angles[0]
-            self.vel_msg.linear.X = dl_hat
-            self.vel_msg.angular.Z = 2*theta
-            self.vel_pub.publish(self.vel_msg)
-            '''
-            t = time.time()
-            while time.time() - t < dt
-                tbot_x = self.odom_pose.position.x
-                tbot_y = self.odom_pose.position.y
-            '''
+            key = '@'
+            while(1):
+                key = getKey()
+                if key == 'e':
+                    self.vel_msg.linear.x = 0
+                    self.vel_msg.angular.z = 0
+                    self.vel_pub.publish(self.vel_msg)
+                    exit()
+                    break
+                self.vel_msg.linear.x = dl_hat
+                self.vel_msg.angular.z = 2*theta
+                self.vel_pub.publish(self.vel_msg)
+                # print(self.vel_msg)
+            #
+            # t = time.time()
+            # while time.time() - t < dt
+            #     tbot_x = self.odom_pose.position.x
+            #     tbot_y = self.odom_pose.position.y
+
 if __name__ == "__main__":
+    if os.name != 'nt':
+        settings = termios.tcgetattr(sys.stdin)
     try:
         turtlebot = Robot()
+        # turtlebot.drive_straight(0,0.1)
+        turtlebot.move_s(2,2,1)
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
