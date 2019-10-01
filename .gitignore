@@ -1,3 +1,4 @@
 #Folders to ignore
 .idea/*
 *.xml
+*.xml
