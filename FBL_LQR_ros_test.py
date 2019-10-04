@@ -254,14 +254,12 @@ class pid_controller:
     def lqr_loop(self, msg):
         global B, Xi, omega,n,x_hat
         for i in range(1, num_steps):
+            print(np.matmul(A,x_hat[:,i-1]))
+            print(np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]])))
             x_temp = np.matmul(A,x_hat[:,i-1]) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
             A_ext = np.array([[1, 0, -dt*Xi*np.sin(x_hat[2,i-1])],
                      [0, 1, dt*Xi*np.cos(x_hat[2,i-1])],
                      [0, 0, 1]])
-            print(A)
-            print(B)
-            print(Xi)
-            print(omega)
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
@@ -297,16 +295,10 @@ if __name__ == "__main__":
                 Robot.vel_pub.publish(Robot.vel_msg)
                 exit()
                 break
-            if Robot.odom_updated:
-                # print(Robot.odom_msg)
-                Robot.lqr_loop(Robot.odom_msg)
-                Robot.odom_updated = False
-            else:
-                num_steps = num_steps - 1
+            Robot.lqr_loop(Robot.odom_msg)
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
-

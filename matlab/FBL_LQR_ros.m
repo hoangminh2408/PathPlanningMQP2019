@@ -286,19 +286,7 @@ end
 first_step_angle = atan((ref_traj(2,2) - ref_traj(2,1))/(ref_traj(1,2) - ref_traj(1,1)));
 init_angle = 0;
 theta = first_step_angle-init_angle(1);
-% msg.Angular.Z = 0.35;
-% send(robot,msg);
-% while abs(theta) > 0.08 && abs(6.28-abs(theta)) >0.08
-%     state = receive(odom,3);
-%     quat = state.Pose.Pose.Orientation;
-%     angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-%     theta = first_step_angle-angles(1)
-%     if strcmpi(get(gcf,'CurrentCharacter'),'e')
-%         break;
-%     end
-% end
-% msg.Angular.Z = 0;
-% send(robot,msg);
+
 state_init = [0;0;1e-4];
 %Initial B
 B_ind = 0;
@@ -308,18 +296,6 @@ B = [cos(0.0079),0;
 
 y(:,1) = state_init;
 
-% while state(3,1) > pi | state(3,1) < -pi
-%     state(3,2) = state(3,1) - 2*pi*sign(state(3,1));
-% end
-
-% move_s(u(1,1),u(2,1));
-% B_can = [];
-% for i=-175:10:185
-%      B = [cos(deg2rad(i)),0;
-%          sin(deg2rad(i)),0;
-%          0              ,1];
-%      B_can = [B_can,B];
-% end
 %% calculate P and s %%
 % for j = 1:37
 %     B_temp = [B_can(:,2*j-1),B_can(:,2*j)];
@@ -332,19 +308,9 @@ Phi = zeros(n,n,num_steps);
 Theta = zeros(n,p,num_steps);
 Theta(:,:,1) = Phi(:,:,1)*C'*Sigma_v_inv;
 
-% for i = 2:num_steps
-% %     dPhi_dt = A*Phi(:,:,i-1) + Phi(:,:,i-1)*A' + Sigma_w - Phi(:,:,i-1)*C'*Sigma_v_inv*C*Phi(:,:,i-1)';
-% %     Phi(:,:,i) = Phi(:,:,i-1) + dt*dPhi_dt;
-% %     Theta(:,:,i) = Phi(:,:,i)*C'*Sigma_v_inv;
-%
-%     Phi_temp = A*Phi(:,:,i-1)*A'+Sigma_w;
-%     Theta(:,:,i) = Phi_temp*C'*inv(C*Phi_temp*C'+Sigma_v);
-%     Phi(:,:,i) = A*Phi(:,:,i-1)*A' + Sigma_w - Phi_temp*C'*inv(C*Phi_temp*C'+Sigma_v)*C*Phi_temp;
-% end
-% u (:,1) = ref_traj_db_dot(1:2,1)/(dt^2) -inv(B_l'*b(:,:,1)*B_l+R)*B_l'*(b(:,:,1)*A_l*x_hat(1:2,1)+s(:,1))/dt;
+
 u (:,1) = ref_traj_db_dot(1:2,1)*dt -inv(B_l'*b(:,:,1)*B_l+R)*B_l'*(b(:,:,1)*A_l*x_hat(1:2,1)+s(:,1))/dt;
-% u(1,1) = ref_traj_db_dot(1,1) + kp1*(ref_traj(1,1)-x_hat(1,1));
-% u(2,1) = ref_traj_db_dot(2,1) + kp2*(ref_traj(2,1)-x_hat(2,1));
+
 Xi = u(1,1)*cos(x_hat(3,1))*dt+u(2,1)*sin(x_hat(3,1))*dt
 omega = dt*(u(2,1)*cos(x_hat(3,1))-u(1,1)*sin(x_hat(3,1)))/Xi
 msg.Angular.Z = omega;
@@ -365,9 +331,6 @@ end
 for i = 2:num_steps
 %     disp(i)
     tic;
-%     msg.Angular.Z = 0;
-%     msg.Linear.X = 0;
-%     send(robot,msg);
 
     %% predicting state
     x_temp = A*x_hat(:,i-1) + B*[1.5*Xi*dt; omega*dt];
