@@ -36,8 +36,12 @@ B = np.array([[1, 0],
               [1, 0],
               [0, 1]])
 C = np.identity(3);
-Sigma_w = np.identity(3);
-Sigma_v = np.identity(3);
+Sigma_w = np.array([[1e-6, 0, 0],
+                    [0, 1e-6, 0],
+                    [0, 0, 1e-6]]);
+Sigma_v = np.array([[1e-6, 0, 0],
+                    [0, 1e-6, 0],
+                    [0, 0, 1e-6]]);
 Q = np.array([[1, 0, 0],
               [0, 1, 0],
               [0, 0, 1]]);
@@ -56,8 +60,7 @@ parametric_func = np.zeros((2,2000))
 parametric_func[0] = x1
 parametric_func[1] = x2
 
-dt = T/num_steps;
-
+dt = float(T)/float(num_steps);
 s = np.zeros((2, num_steps));
 stemp = np.array([[0],[0]]);
 b = np.zeros((2,2,num_steps));
@@ -205,9 +208,6 @@ u[0,0] = 2.08018939316653
 u[1,0] = 1.04750514455758
 # u[:,0] = ref_traj_db_dot[0:1,0]*dt - np.linalg.inv(B_l.conj().transpose()*b[:,:,0]*B_l+R)*B_l.conj().transpose()*(b[:,:,1]*A_l*x_hat[0:1,0]+s[:,0])/dt;
 
-Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
-omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
-
 def getKey():
     if os.name == 'nt':
       return msvcrt.getch()
@@ -230,11 +230,11 @@ class pid_controller:
         self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
         self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
         self.scan_sub = rospy.Subscriber('/scan', LaserScan, callback=self.scan_callback)
-        self.odom = Odometry()
-        self.pose = Pose()
-        self.twist = Twist()
-        self.imu = Imu()
-        self.scan = LaserScan()
+        self.odom_msg = Odometry()
+        self.pose_msg = Pose()
+        self.vel_msg = Twist()
+        self.imu_msg = Imu()
+        self.scan_msg = LaserScan()
         self.odom_updated = False
         self.imu_updated = False
         self.scan_updated = False
@@ -251,33 +251,58 @@ class pid_controller:
         self.scan_msg = msg
         self.scan_updated = True
 
-    def lqr_loop(self, msg):
-        global B, Xi, omega,n,x_hat
-        for i in range(1, num_steps):
-            print(np.matmul(A,x_hat[:,i-1]))
-            print(np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]])))
-            x_temp = np.matmul(A,x_hat[:,i-1]) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
+    def lqr_loop(self, msg, i):
+        global B, Xi, omega,n,x_hat,Xi,omega
+        if i == 0:
+            Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
+            omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
+            Robot.vel_msg.linear.x = Xi
+            Robot.vel_msg.angular.z = omega
+            Robot.vel_pub.publish(Robot.vel_msg)
+        else:
+            rospy.sleep(0.05)
+            x_temp = np.matmul(x_hat[:,i-1],A).reshape(-1, 1) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
+            print(np.matmul(x_hat[:,i-1],A))
+            print("[][][][]")
             A_ext = np.array([[1, 0, -dt*Xi*np.sin(x_hat[2,i-1])],
                      [0, 1, dt*Xi*np.cos(x_hat[2,i-1])],
                      [0, 0, 1]])
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
+            print("Tbot x is: " + str(tbot_x))
+            print("Tbot y is: " + str(tbot_y))
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
-            y[:,i] = [tbot_x, tbot_y, angles[0]];
-            z = y[:,i]-np.matmul(C,x_temp);
+            y[:,i] = [tbot_x, tbot_y, angles[2]];
+            print(np.matmul(C,x_temp))
+            print("/////////")
+            z = y[:,i].reshape(-1,1)-np.matmul(C,x_temp);
+            print(z)
+            print(":::::::::::")
+            # print(y[:,i].reshape(-1, 1))
             s_temp = np.matmul(np.matmul(C,Phi_temp),C.conj().transpose())+Sigma_v;
-            Theta[:,:,i] = np.matmul(Phi_temp,C.conj().transpose())/s_temp;
-            x_hat[:,i] = x_temp + np.matmul(Theta[:,:,i],z);
+            Theta[:,:,i] = np.divide(np.matmul(Phi_temp,C.conj().transpose()),s_temp);
+            Theta[np.isnan(Theta)] = 0
+            # print(np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3))
+            # print(x_hat[:,i])
+            x_hat[:,i] = np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3);
+            if i == 2:
+                self.vel_msg.linear.x = 0
+                self.vel_msg.angular.z = 0
+                self.vel_pub.publish(Robot.vel_msg)
+                exit()
+            # print(x_hat[:,i])
             Phi[:,:,i] = np.matmul((np.identity(n) - np.matmul(Theta[:,:,i],C)),Phi_temp)
             B = np.array([[np.cos(x_hat[2,i]),0],[np.sin(x_hat[2,i]),0],[0,1]])
-            u[:,i] = ref_traj_db_dot[0:2,i]*dt -B_l.conj().transpose()/(np.matmul(np.matmul(B_l.conj().transpose(),b[:,:,i]),B_l)+R)*(np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i])/dt;
+            # print(x_temp + np.matmul(Theta[:,:,i],z))
+            print(np.divide(np.matmul(B_l.conj().transpose(),(np.matmul(np.matmul(B_l.conj().transpose(),b[:,:,i]),B_l)+R))))
+            u[:,i] = ref_traj_db_dot[0:2,i]*dt - np.divide(np.matmul(B_l.conj().transpose(),(np.matmul(np.matmul(B_l.conj().transpose(),b[:,:,i]),B_l)+R)),(np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i]))/dt;
             Xi = u[0,i]*np.cos(x_hat[2,i])*dt+u[1,i]*np.sin(x_hat[2,i])*dt
             omega = dt*(u[1,i]*np.cos(x_hat[2,i])-u[0,i]*np.sin(x_hat[2,i]))/Xi
-            twist_msg.linear.x = Xi
-            twist_msg.angular.z = omega
-            self.vel_pub.publish(twist_msg)
+            self.vel_msg.linear.x = Xi
+            self.vel_msg.angular.z = omega
+            self.vel_pub.publish(self.vel_msg)
 
 if __name__ == "__main__":
     if os.name != 'nt':
@@ -287,7 +312,7 @@ if __name__ == "__main__":
         A = np.identity(3);
         # controller_init(Robot)
         # Robot.odom_callback(Robot.odom_msg)
-        for i in range(1, num_steps):
+        for i in range(0, num_steps):
             key = getKey()
             if key == 'e':
                 Robot.vel_msg.linear.x = 0
@@ -295,10 +320,11 @@ if __name__ == "__main__":
                 Robot.vel_pub.publish(Robot.vel_msg)
                 exit()
                 break
-            Robot.lqr_loop(Robot.odom_msg)
+            Robot.lqr_loop(Robot.odom_msg,i)
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+
