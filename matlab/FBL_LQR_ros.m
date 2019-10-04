@@ -256,7 +256,12 @@ cost = zeros(1,num_steps);
 
 % state.Pose.Pose.Orientation
 
-
+robot = rospublisher('/cmd_vel');
+laser = rossubscriber('/scan');
+imu = rossubscriber('/imu');
+odom = rossubscriber('/odom');
+stmsg = rosmessage(odom);
+msg = rosmessage(robot);
 %% Start
 finish=false;
 set(gcf,'CurrentCharacter','@'); % set to a dummy character
@@ -344,7 +349,7 @@ Xi = u(1,1)*cos(x_hat(3,1))*dt+u(2,1)*sin(x_hat(3,1))*dt
 omega = dt*(u(2,1)*cos(x_hat(3,1))-u(1,1)*sin(x_hat(3,1)))/Xi
 msg.Angular.Z = omega;
 msg.Linear.X = Xi;
-send(robot,msg);
+% send(robot,msg);
 tic;
 while toc<dt
     plot(y(1,i),y(2,i),'.')
@@ -392,62 +397,13 @@ for i = 2:num_steps
     x_hat(:,i) = x_temp + Theta(:,:,i)*z;
     Phi(:,:,i) = (eye(n) - Theta(:,:,i)*C)*Phi_temp;
 
-%     Phi(:,:,i) = A*Phi(:,:,i-1)*A' + Sigma_w - Phi_temp*C'*inv(C*Phi_temp*C'+Sigma_v)*C*Phi_temp;
-
-%     x_hat(1:2,i) = y(1:2,i);
-
-    %Initial B
-%     B_ind = round(rad2deg(state(3,i-1))/10);
-
-%     B =0.01.* [B_can(:,2*(18+B_ind)+1),B_can(:,2*(18+B_ind)+2)];
-
-    %%
-%     slope_original = (ref_traj(2,i) - ref_traj(2,i-1))/(ref_traj(1,i) - ref_traj(1,i-1));
-%     slope_real = (ref_traj(2,i) - state(2,i-1))/(ref_traj(1,i) - state(1,i-1));
-%     if slope_real > slope_original
-%     dirc = atan((ref_traj(2,i) - state(2,i-1))/(ref_traj(1,i) - state(1,i-1)));
 
     %%
     B = [cos(x_hat(3,i)),0;
          sin(x_hat(3,i)),0;
          0              ,1];
 
-
-%     for j = num_steps-1:-1:1
-%     %     P(:,:,i) = P(:,:,i+1) + dt*(A'*P(:,:,i+1) + P(:,:,i+1)*A - P(:,:,i+1)*B*R_inv*B'*P(:,:,i+1) + Q);
-%         k = -inv(B'*b(:,:,j+1)*B+R)*B'*b(:,:,j+1)*A;
-%         b(:,:,j) = A'*(b(:,:,j+1)-b(:,:,j+1)*B*inv(B'*b(:,:,j+1)*B+R)*B'*b(:,:,j+1))*A+Q;
-%     %     s(:,i) = (A' - 0.5*(b(:,:,i)-Q)*B*R_inv*B')'*s(:,i+1) - Q*ref_traj(:,i+1);
-%         s(:,j) = (A' + k'*B')*s(:,j+1) - Q*ref_traj(:,j+1);
-%     %     s(:,i) = s(:,i+1) + dsdt*dt;
-%     end
-%     A*state(:,i-1)-ref_traj(:,i-1)
-
-%     u(:,i-1) = -inv(R + B'*P(:,:,i)*B) * B'*P(:,:,i)*(A*state(:,i-1)-ref_traj(:,i-1));
-%     move_s(u(1,i),u(2,i));
-%     B = [cos(state(3,i-1)),0;
-%          sin(state(3,i-1)),0;
-%          0                ,1];
-
-%     B = 0.01.*B;
-%         P(:,:,j) = P(:,:,j+1) + dt*(A'*P(:,:,j+1) + P(:,:,j+1)*A - P(:,:,j+1)*B*R_inv*B'*P(:,:,j+1) + Q);
-%         dsdt = (A' - P(:,:,j)*B*R_inv*B')'*s(:,j+1) - Q*ref_traj(:,j+1);
-%         s(:,j) = s(:,j+1) + dsdt*dt;
-
-%     u (:,i) = -inv(B_l'*b(:,:,i)*B_l+R)*B_l'*(b(:,:,i)*A_l*x_hat(1:2,i)+s(:,i))/dt;
-%       u (:,i) = ref_traj_db_dot(1:2,i)*dt -inv(B_l'*b(:,:,i)*B_l+R)*B_l'*(b(:,:,i)*A_l*x_hat(1:2,i)+s(:,i))/dt;
     u (:,i) = ref_traj_db_dot(1:2,i)*dt -B_l'/(B_l'*b(:,:,i)*B_l+R)*(b(:,:,i)*A_l*x_hat(1:2,i)+s(:,i))/dt;
-%     u (:,i-1) = -inv(B'*b(:,:,i-1)*B+R)*B'*(b(:,:,i-1)*A*state(:,i-1)+s(:,i-1));
-%     u(1,i) = ref_traj_db_dot(1,i) + kp1*(ref_traj(1,i)-y(1,i)) + kd1*(ref_traj_dot(1,i)-y(1,i)+y(1,i-1));
-%     u(2,i) = ref_traj_db_dot(2,i) + kp2*(ref_traj(2,i)-y(2,i)) + kd2*(ref_traj_dot(2,i)-y(2,i)+y(2,i-1));
-%     u(1,i) = ref_traj_db_dot(1,i)/(dt^2) + kp1*(ref_traj(1,i)-x_hat(1,i)) + kd1*(ref_traj_dot(1,i)-x_hat(1,i)+x_hat(1,i-1))/dt;
-%     u(2,i) = ref_traj_db_dot(2,i)/(dt^2) + kp2*(ref_traj(2,i)-x_hat(2,i)) + kd2*(ref_traj_dot(2,i)-x_hat(2,i)+x_hat(2,i-1))/dt;
-%     u(1,i-1) = ref_traj_dot(1,i-1) + kp1*(ref_traj(1,i-1)-x_hat(1,i-1));
-%     u(2,i-1) = ref_traj_dot(2,i-1) + kp2*(ref_traj(2,i-1)-x_hat(2,i-1));
-%     u(:,i-1) = -(inv(eye(2)+inv(R)*B'*P(:,:,i)*B)*inv(R)*B'*P(:,:,i)*A)*(state(:,i-1)-ref_traj(:,i-1));
-%     u(:,i-1)=-0.5*inv(R)*B'*P(:,:,i-1)*state(:,i-1)-0.5*inv(R)*B'*s(:,i-1);
-%     u(:,i-1)=dt*u(:,i-1);
-%     state(:,i) = A*state(:,i-1) + B*u(:,i-1) + Theta*(ref_traj(:,i-1) - C*state(:,i-1));
 
     Xi = u(1,i)*cos(x_hat(3,i))*dt+u(2,i)*sin(x_hat(3,i))*dt;
 
