@@ -54,8 +54,8 @@ kp2 = 1
 kd1 = 0.8
 kd2 = 0.8
 
-x1 = np.sin(t/10)
-x2 = np.sin(t/20)
+x1 = 0.5*np.sin(t/10)
+x2 = 0.5*np.sin(t/20)
 
 parametric_func = np.zeros((2,100))
 parametric_func[0] = x1
@@ -276,7 +276,8 @@ class pid_controller:
         print("Tbot y is: " + str(tbot_y))
         quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
         angles = euler_from_quaternion(quat)
-        y[:,i] = [tbot_x, tbot_y, angles[0]];
+        print(angles)
+        y[:,i] = [tbot_x, tbot_y, angles[2]];
         x_temp = np.matmul(A,x_hat[:,i-1]) + np.matmul(B,u[:,i-1]);
         x_hat[:,i] = x_temp + np.matmul(Theta[:,:,i],(y[:,i]-np.matmul(C,x_temp)));
         B = np.array([[np.cos(y[2,i]),0],[np.sin(y[2,i]),0],[0,1]])
@@ -284,10 +285,10 @@ class pid_controller:
         u[1,i] = ref_traj_db_dot[1,i] + kp2*(ref_traj[1,i]-y[1,i]) + kd2*(ref_traj_dot[1,i]-y[1,i]+y[1,i-1]);
         Xi = u[0,i]*np.cos(y[2,i])*dt+u[1,i]*np.sin(y[2,i])*dt
         omega = (u[1,i]*np.cos(y[2,i])-u[0,i]*np.sin(y[2,i]))/Xi
-        if omega > 0.3:
-         omega = 0.3
-        elif omega < -0.3:
-         omega = -0.3
+        # if omega > 0.3:
+        #  omega = 0.3
+        # elif omega < -0.3:
+        #  omega = -0.3
         if y[2,i] > math.pi or y[2,i] < -math.pi:
          y[2,i] = y[2,i] - 2*math.pi*np.sign(y[2,i]);
         # error[i] = math.pow(np.linalg.norm(y[0:2,i] - ref_traj[0:2,i]),2)/2
