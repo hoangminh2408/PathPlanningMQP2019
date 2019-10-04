@@ -69,7 +69,7 @@ A_l = np.identity(2);
 B_l = dt*np.identity(2);
 Q_l = np.identity(2);
 degree = 3;
-
+B_lh = B_l.conj().transpose()
 g_D = rd_tar^2;
 g_U = rd_obs^2;
 
@@ -84,15 +84,15 @@ ref_traj[2,ref_length-1] = ref_traj[2,ref_length-2];
 
 ref_traj_dot = np.zeros((3,ref_length));
 for i in range (1, ref_length):
-    ref_traj_dot[0,i] = ref_traj[0,i]-ref_traj[0,i-1]
-    ref_traj_dot[1,i] = ref_traj[1,i]-ref_traj[1,i-1]
-    ref_traj_dot[2,i] = ref_traj[2,i]-ref_traj[2,i-1]
+    ref_traj_dot[0,i] = (ref_traj[0,i]-ref_traj[0,i-1])/dt
+    ref_traj_dot[1,i] = (ref_traj[1,i]-ref_traj[1,i-1])/dt
+    ref_traj_dot[2,i] = (ref_traj[2,i]-ref_traj[2,i-1])/dt
 
 ref_traj_db_dot = np.zeros((3,ref_length))
 for i in range(0, ref_length-1):
-    ref_traj_db_dot[0,i] = ref_traj_dot[0,i+1]-ref_traj_dot[0,i]
-    ref_traj_db_dot[1,i] = ref_traj_dot[1,i+1]-ref_traj_dot[1,i]
-    ref_traj_db_dot[2,i] = ref_traj_dot[2,i+1]-ref_traj_dot[2,i]
+    ref_traj_db_dot[0,i] = (ref_traj_dot[0,i+1]-ref_traj_dot[0,i])/dt
+    ref_traj_db_dot[1,i] = (ref_traj_dot[1,i+1]-ref_traj_dot[1,i])/dt
+    ref_traj_db_dot[2,i] = (ref_traj_dot[2,i+1]-ref_traj_dot[2,i])/dt
 
 ref_length = len(ref_traj[2]);
 rd = np.zeros((2,ref_length-1));
@@ -116,10 +116,8 @@ if dt <= 0:
 if n <= 0:
     n = 2;
 
-
 if m <= 0:
     m = 2;
-
 
 if p <= 0:
     p = 2;
@@ -256,50 +254,64 @@ class pid_controller:
         if i == 0:
             Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
             omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
-            Robot.vel_msg.linear.x = Xi
-            Robot.vel_msg.angular.z = omega
-            Robot.vel_pub.publish(Robot.vel_msg)
+            # Robot.vel_msg.linear.x = Xi
+            # Robot.vel_msg.angular.z = omega
+            # Robot.vel_pub.publish(Robot.vel_msg)
         else:
             rospy.sleep(0.05)
             x_temp = np.matmul(x_hat[:,i-1],A).reshape(-1, 1) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
-            print(np.matmul(x_hat[:,i-1],A))
-            print("[][][][]")
+            # print("x_temp is: " + str(x_temp))
+            # print(np.matmul(x_hat[:,i-1],A))
+            # print("[][][][]")
             A_ext = np.array([[1, 0, -dt*Xi*np.sin(x_hat[2,i-1])],
                      [0, 1, dt*Xi*np.cos(x_hat[2,i-1])],
                      [0, 0, 1]])
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
-            print("Tbot x is: " + str(tbot_x))
-            print("Tbot y is: " + str(tbot_y))
+            # print("Tbot x is: " + str(tbot_x))
+            # print("Tbot y is: " + str(tbot_y))
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
             y[:,i] = [tbot_x, tbot_y, angles[2]];
-            print(np.matmul(C,x_temp))
-            print("/////////")
+            # print("Angles are: " + str(angles))
+            # print("/////////")
+            # print("Y is: " + str(y[:,i]))
             z = y[:,i].reshape(-1,1)-np.matmul(C,x_temp);
-            print(z)
-            print(":::::::::::")
+            # print("Z is: " + str(z))
+            # print(":::::::::::")
             # print(y[:,i].reshape(-1, 1))
             s_temp = np.matmul(np.matmul(C,Phi_temp),C.conj().transpose())+Sigma_v;
             Theta[:,:,i] = np.divide(np.matmul(Phi_temp,C.conj().transpose()),s_temp);
             Theta[np.isnan(Theta)] = 0
             # print(np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3))
             # print(x_hat[:,i])
-            x_hat[:,i] = np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3);
-            if i == 2:
-                self.vel_msg.linear.x = 0
-                self.vel_msg.angular.z = 0
-                self.vel_pub.publish(Robot.vel_msg)
-                exit()
-            # print(x_hat[:,i])
-            Phi[:,:,i] = np.matmul((np.identity(n) - np.matmul(Theta[:,:,i],C)),Phi_temp)
+            print(np.matmul(Theta[:,:,i],z))
+            x_hat[:,i] = np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3); #Use the real state instead of predicted state.
+            Phi[:,:,i] = np.matmul((np.identity(n) - np.matmul(Theta[:,:,i],C)),Phi_temp) 
+            # print("x_hat is: " + str(x_hat))
+            # print(Phi[:,:,i])
             B = np.array([[np.cos(x_hat[2,i]),0],[np.sin(x_hat[2,i]),0],[0,1]])
-            # print(x_temp + np.matmul(Theta[:,:,i],z))
-            print(np.divide(np.matmul(B_l.conj().transpose(),(np.matmul(np.matmul(B_l.conj().transpose(),b[:,:,i]),B_l)+R))))
-            u[:,i] = ref_traj_db_dot[0:2,i]*dt - np.divide(np.matmul(B_l.conj().transpose(),(np.matmul(np.matmul(B_l.conj().transpose(),b[:,:,i]),B_l)+R)),(np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i]))/dt;
+            # print((np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i]))
+            uu1 = np.matmul(np.matmul(B_lh,b[:,:,i]),B_l)+R
+            uu2 = B_lh/uu1              #USE INVERSE INSTEAD
+            uu2[np.isnan(uu2)] = 0
+            uu3 = (np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i])
+            uu3 = np.reshape(uu3,(2,1))
+            uu4 = np.matmul(uu2,uu3)/dt
+            uu4 = np.reshape(uu4,(2,1))
+            # print("uu1 is: " + str(uu1))
+            # print("uu2 is: " + str(uu2))
+            # print("uu3 is: " + str(np.reshape(uu3,(2,1))))
+            # print("uu4 is: " + str(np.reshape(uu4,(2,1))))
+            uu5 = np.reshape(ref_traj_db_dot[0:2,i]*dt,(2,1)) - uu4
+            u[:,i] = np.reshape(uu5,(1,2))
+            print("U is: " + str(u[:,i]))
+            # exit()
             Xi = u[0,i]*np.cos(x_hat[2,i])*dt+u[1,i]*np.sin(x_hat[2,i])*dt
             omega = dt*(u[1,i]*np.cos(x_hat[2,i])-u[0,i]*np.sin(x_hat[2,i]))/Xi
+            print("Xi is: " + str(Xi))
+            print("omega is: " + str(omega))
             self.vel_msg.linear.x = Xi
             self.vel_msg.angular.z = omega
             self.vel_pub.publish(self.vel_msg)
