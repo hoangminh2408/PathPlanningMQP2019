@@ -8,6 +8,7 @@ from tf.transformations import euler_from_quaternion
 import copy
 import time
 import sys, select, os
+import matplotlib.pyplot as plt
 if os.name == 'nt':
   import msvcrt
 else:
@@ -24,8 +25,8 @@ from tf.transformations import euler_from_quaternion
 # robot.vel_msg.angular.z = omega
 # robot.vel_pub.publish(robot.vel_msg)
 print("Initializing Controller...")
-T = 100
-num_steps = 100
+T = 50
+num_steps = 50
 n = 3
 m = 2
 p = 3
@@ -61,7 +62,7 @@ parametric_func = np.zeros((2,100))
 parametric_func[0] = x1
 parametric_func[1] = x2
 
-dt = T/num_steps
+dt = float(T)/num_steps
 s = np.zeros((n, num_steps))
 b = np.zeros((n,n,num_steps))
 
@@ -76,6 +77,7 @@ g_U = rd_obs^2
 ref_traj = parametric_func
 diffrc = ref_traj[:,0]
 # ref_traj[:,:] = ref_traj[:,:] - diffrc[:];
+robot_pos = np.zeros((2,num_steps))
 
 ref_length = len(ref_traj[1])
 ref_traj = np.concatenate((ref_traj, np.ones((1,ref_length))))
@@ -233,6 +235,15 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
+def plotting():
+    global ref_traj, robot_pos
+    fig1 = plt.figure()
+    fig1.suptitle("Reference trajectory vs Actual trajectory")
+    plt.ioff()
+    plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
+    plt.plot(robot_pos[0,:], robot_pos[1,:], label = 'Actual trajectory')
+    plt.show()
+
 class pid_controller:
     def __init__(self):
         print("Creating PID Controller Node")
@@ -267,13 +278,16 @@ class pid_controller:
 
 
     # Odom
-    def pid_loop(self, msg):
-        global B
-        rospy.sleep(0.8)
+    def pid_loop(self, msg,i):
+        global B, robot_pos
+        rospy.sleep(0.5)
+        print("Step number: " + str(i))
         tbot_x = msg.pose.pose.position.x
         tbot_y = msg.pose.pose.position.y
         print("Tbot x is: " + str(tbot_x))
         print("Tbot y is: " + str(tbot_y))
+        robot_pos[0,i] = tbot_x
+        robot_pos[1,i] = tbot_y
         quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
         angles = euler_from_quaternion(quat)
         print(angles)
@@ -303,7 +317,6 @@ if __name__ == "__main__":
     try:
         Robot = pid_controller()
         # controller_init(Robot)
-        num_steps = 100
         # Robot.odom_callback(Robot.odom_msg)
         for i in range(1, num_steps):
             key = getKey()
@@ -315,13 +328,15 @@ if __name__ == "__main__":
                 break
             if Robot.odom_updated:
                 # print(Robot.odom_msg)
-                Robot.pid_loop(Robot.odom_msg)
+                Robot.pid_loop(Robot.odom_msg,i)
                 Robot.odom_updated = False
             else:
                 num_steps = num_steps - 1
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
+        plotting()
+        exit()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

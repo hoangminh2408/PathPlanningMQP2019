@@ -7,6 +7,7 @@ import math
 from tf.transformations import euler_from_quaternion
 import copy
 import time
+import matplotlib.pyplot as plt
 import sys, select, os
 if os.name == 'nt':
   import msvcrt
@@ -25,8 +26,8 @@ from tf.transformations import euler_from_quaternion
 # robot.vel_pub.publish(robot.vel_msg)
 
 print("Initializing Controller...")
-T = 100;
-num_steps = 2000;
+T = 50;
+num_steps = 400;
 n = 3;
 m = 2;
 p = 3;
@@ -47,16 +48,16 @@ Q = np.array([[1, 0, 0],
               [0, 0, 1]]);
 R = np.array([[1, 0],
               [0, 1]]);
-start_point = np.array([0, 0, 0]);
+
 rd_tar = 1;
 rd_obs = 1;
 target = np.array([2, 0.001, 0]);
 obs = np.array([-1, 1]);
-t = np.linspace(0.0, 100.0, num = 2000);
-x1 = np.sin(t/10);
-x2 = np.sin(t/20);
+t = np.linspace(0.0, 100.0, num = num_steps);
+x1 = 0.8*np.sin(t/10);
+x2 = 0.8*np.sin(t/20);
 
-parametric_func = np.zeros((2,2000))
+parametric_func = np.zeros((2,num_steps))
 parametric_func[0] = x1
 parametric_func[1] = x2
 
@@ -78,6 +79,8 @@ diffrc = ref_traj[:,0]
 # ref_traj[:,:] = ref_traj[:,:] - diffrc[:];
 ref_length = len(ref_traj[1]);
 ref_traj = np.concatenate((ref_traj, np.ones((1,ref_length))));
+robot_pos = np.zeros((2,num_steps))
+
 for i in range(0,ref_length-1):
     ref_traj[2,i] = np.arctan((ref_traj[1,i+1]-ref_traj[1,i])/(ref_traj[0,i+1]-ref_traj[0,i]));
 ref_traj[2,ref_length-1] = ref_traj[2,ref_length-2];
@@ -107,7 +110,7 @@ for i in range(0,ref_length-2):
 
 # redefine start point and target
 # start_point = ref_traj(:,1);
-
+start_point = ref_traj[:,0];
 target = ref_traj[:,ref_length-1]
 
 if dt <= 0:
@@ -202,9 +205,27 @@ Phi = np.zeros((n,n,num_steps));
 Theta = np.zeros((n,p,num_steps));
 Theta[:,:,0] = Phi[:,:,0]*C.conj().transpose()*Sigma_v_inv;
 
-u[0,0] = 2.08018939316653
-u[1,0] = 1.04750514455758
+
+uu1 = np.linalg.inv(np.matmul(np.matmul(B_lh,b[:,:,0]),B_l)+R)
+uu2 = np.matmul(uu1,B_lh)          #USE INVERSE INSTEAD
+uu3 = (np.matmul(np.matmul(b[:,:,0],A_l),x_hat[0:2,0])+s[:,0])
+uu3 = np.reshape(uu3,(2,1))
+uu4 = np.matmul(uu2,uu3)/dt
+uu4 = np.reshape(uu4,(2,1))
+uu5 = np.reshape(ref_traj_db_dot[0:2,0]*dt,(2,1)) - uu4
+
+u[:,0] = np.reshape(uu5,(1,2))
+print("u0 is: " + str(u[0,0]))
+print("u1 is: " + str(u[1,0]))
 # u[:,0] = ref_traj_db_dot[0:1,0]*dt - np.linalg.inv(B_l.conj().transpose()*b[:,:,0]*B_l+R)*B_l.conj().transpose()*(b[:,:,1]*A_l*x_hat[0:1,0]+s[:,0])/dt;
+def plotting():
+    global ref_traj, robot_pos
+    fig1 = plt.figure()
+    fig1.suptitle("Reference trajectory vs Actual trajectory")
+    plt.ioff()
+    plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
+    plt.plot(robot_pos[0,:], robot_pos[1,:], label = 'Actual trajectory')
+    plt.show()
 
 def getKey():
     if os.name == 'nt':
@@ -220,7 +241,7 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
-class pid_controller:
+class lqr_controller:
     def __init__(self):
         print("Creating LQR Controller Node")
         rospy.init_node('LQR_Controller')
@@ -250,7 +271,8 @@ class pid_controller:
         self.scan_updated = True
 
     def lqr_loop(self, msg, i):
-        global B, Xi, omega,n,x_hat,Xi,omega
+        global B, Xi, omega,n,x_hat,dt
+        rospy.sleep(dt)
         if i == 0:
             Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
             omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
@@ -258,9 +280,9 @@ class pid_controller:
             # Robot.vel_msg.angular.z = omega
             # Robot.vel_pub.publish(Robot.vel_msg)
         else:
-            rospy.sleep(0.05)
+            print(i)
             x_temp = np.matmul(x_hat[:,i-1],A).reshape(-1, 1) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
-            # print("x_temp is: " + str(x_temp))
+            print("x_temp is: " + str(x_temp))
             # print(np.matmul(x_hat[:,i-1],A))
             # print("[][][][]")
             A_ext = np.array([[1, 0, -dt*Xi*np.sin(x_hat[2,i-1])],
@@ -269,6 +291,8 @@ class pid_controller:
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
+            robot_pos[0,i] = tbot_x
+            robot_pos[1,i] = tbot_y
             # print("Tbot x is: " + str(tbot_x))
             # print("Tbot y is: " + str(tbot_y))
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
@@ -282,28 +306,21 @@ class pid_controller:
             # print(":::::::::::")
             # print(y[:,i].reshape(-1, 1))
             s_temp = np.matmul(np.matmul(C,Phi_temp),C.conj().transpose())+Sigma_v;
-            Theta[:,:,i] = np.divide(np.matmul(Phi_temp,C.conj().transpose()),s_temp);
-            Theta[np.isnan(Theta)] = 0
+            Theta[:,:,i] = np.matmul(np.matmul(Phi_temp,C.conj().transpose()),np.linalg.inv(s_temp));
             # print(np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3))
             # print(x_hat[:,i])
-            print(np.matmul(Theta[:,:,i],z))
             x_hat[:,i] = np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3); #Use the real state instead of predicted state.
-            Phi[:,:,i] = np.matmul((np.identity(n) - np.matmul(Theta[:,:,i],C)),Phi_temp) 
+            Phi[:,:,i] = np.matmul((np.identity(n) - np.matmul(Theta[:,:,i],C)),Phi_temp)
             # print("x_hat is: " + str(x_hat))
             # print(Phi[:,:,i])
             B = np.array([[np.cos(x_hat[2,i]),0],[np.sin(x_hat[2,i]),0],[0,1]])
             # print((np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i]))
-            uu1 = np.matmul(np.matmul(B_lh,b[:,:,i]),B_l)+R
-            uu2 = B_lh/uu1              #USE INVERSE INSTEAD
-            uu2[np.isnan(uu2)] = 0
+            uu1 = np.linalg.inv(np.matmul(np.matmul(B_lh,b[:,:,i]),B_l)+R)
+            uu2 = np.matmul(uu1,B_lh)          #USE INVERSE INSTEAD
             uu3 = (np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i])
             uu3 = np.reshape(uu3,(2,1))
             uu4 = np.matmul(uu2,uu3)/dt
             uu4 = np.reshape(uu4,(2,1))
-            # print("uu1 is: " + str(uu1))
-            # print("uu2 is: " + str(uu2))
-            # print("uu3 is: " + str(np.reshape(uu3,(2,1))))
-            # print("uu4 is: " + str(np.reshape(uu4,(2,1))))
             uu5 = np.reshape(ref_traj_db_dot[0:2,i]*dt,(2,1)) - uu4
             u[:,i] = np.reshape(uu5,(1,2))
             print("U is: " + str(u[:,i]))
@@ -320,7 +337,7 @@ if __name__ == "__main__":
     if os.name != 'nt':
         settings = termios.tcgetattr(sys.stdin)
     try:
-        Robot = pid_controller()
+        Robot = lqr_controller()
         A = np.identity(3);
         # controller_init(Robot)
         # Robot.odom_callback(Robot.odom_msg)
@@ -336,6 +353,7 @@ if __name__ == "__main__":
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
+        plotting()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
