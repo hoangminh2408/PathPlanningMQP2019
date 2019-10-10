@@ -18,15 +18,9 @@ from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu, LaserScan
 from tf.transformations import euler_from_quaternion
-#Done as a node itself
 
-# def controller_init(robot):
-
-# robot.vel_msg.linear.x = Xi
-# robot.vel_msg.angular.z = omega
-# robot.vel_pub.publish(robot.vel_msg)
-
-print("Initializing Controller...")
+print("Initializing Controller Variables")
+print("................................")
 T = 150;
 num_steps = 300000;
 tgetkey = 0;
@@ -79,7 +73,7 @@ g_U = rd_obs^2;
 
 ref_traj = parametric_func
 diffrc = ref_traj[:,0]
-# ref_traj[:,:] = ref_traj[:,:] - diffrc[:];
+
 ref_length = len(ref_traj[1]);
 ref_traj = np.concatenate((ref_traj, np.ones((1,ref_length))));
 
@@ -264,7 +258,7 @@ def getKey():
 class lqr_controller:
     def __init__(self):
         print("Creating LQR Controller Node")
-        rospy.init_node('LQR_Controller')
+        print("............................")
         self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2)
         self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
         self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
@@ -350,7 +344,6 @@ if __name__ == "__main__":
         settings = termios.tcgetattr(sys.stdin)
     try:
         Robot = lqr_controller()
-        start_time = time.time()
         for i in range(0, num_steps):
             key = getKey()
             if key == 'e':
@@ -363,7 +356,6 @@ if __name__ == "__main__":
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
-        elapsed_time = time.time() - start_time
         plotting()
         rospy.spin()
     except rospy.ROSInterruptException:
