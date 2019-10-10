@@ -27,8 +27,10 @@ from tf.transformations import euler_from_quaternion
 # robot.vel_pub.publish(robot.vel_msg)
 
 print("Initializing Controller...")
-T = 100;
-num_steps = 400;
+T = 150;
+num_steps = 300000;
+tgetkey = 0;
+
 n = 3;
 m = 2;
 p = 3;
@@ -80,7 +82,6 @@ diffrc = ref_traj[:,0]
 # ref_traj[:,:] = ref_traj[:,:] - diffrc[:];
 ref_length = len(ref_traj[1]);
 ref_traj = np.concatenate((ref_traj, np.ones((1,ref_length))));
-robot_pos = np.zeros((2,num_steps))
 
 for i in range(0,ref_length-1):
     ref_traj[2,i] = np.arctan((ref_traj[1,i+1]-ref_traj[1,i])/(ref_traj[0,i+1]-ref_traj[0,i]));
@@ -178,7 +179,7 @@ Sigma_x_p = np.zeros((n,n));
 error = np.zeros((1,num_steps));
 cost = np.zeros((1,num_steps));
 finish = False;
-# set(gcf,'CurrentCharacter','@'); % set to a dummy character
+
 for j in range(num_steps-2, -1, -1):
     k = -(np.linalg.inv(B_l.conj().transpose()*b[:,:,j+1]*B_l+R)*B_l.conj().transpose()*b[:,:,j+1])*A_l;
     b[:,:,j] = A_l.conj().transpose()*(b[:,:,j+1]-b[:,:,j+1]*B_l*np.linalg.inv(B_l.conj().transpose()*b[:,:,j+1]*B_l+R)*B_l.conj().transpose()*b[:,:,j+1])*A_l+Q_l;
@@ -219,26 +220,39 @@ u[:,0] = np.reshape(uu5,(1,2))
 start_time = 0
 elapsed_time = 0
 def plotting():
-    global ref_traj, robot_pos, dt, T, num_steps, elapsed_time
-    fig1 = plt.figure()
-    fig1.suptitle("Reference trajectory vs Actual trajectory, " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "Elapsed time: " + str(elapsed_time))
+    global ref_traj, y, dt, T, num_steps, elapsed_time
     plt.ioff()
+    fig1 = plt.figure()
+    fig1.suptitle("Reference trajectory vs Actual trajectory\n " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
-    plt.plot(robot_pos[0,:], robot_pos[1,:], label = 'Actual trajectory')
+    plt.plot(y[0,:], y[1,:], label = 'Actual trajectory')
+
     fig2 = plt.figure()
-    fig2.suptitle("Mean Square Error")
+    fig2.suptitle("Mean Square Error\n" + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     error = np.zeros(num_steps)
     for i in range(0, num_steps):
         error[i] = math.pow((np.linalg.norm(x_hat[0:2,i]-ref_traj[0:2,i])),2)/2;
     plt.plot(error)
+
+    fig3 = plt.figure()
+    fig3.suptitle("Reference x vs Actual x")
+    plt.plot(ref_traj[0,:], label = "Reference x")
+    plt.plot(y[0,:], label = "Actual x")
+
+    fig4 = plt.figure()
+    fig4.suptitle("Reference y vs Actual y")
+    plt.plot(ref_traj[1,:], label = "Reference y")
+    plt.plot(y[1,:], label = "Actual y")
+
     plt.show()
 
 def getKey():
+    global tgetkey
     if os.name == 'nt':
       return msvcrt.getch()
 
     tty.setraw(sys.stdin.fileno())
-    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+    rlist, _, _ = select.select([sys.stdin], [], [], tgetkey)
     if rlist:
         key = sys.stdin.read(1)
     else:
@@ -280,17 +294,18 @@ class lqr_controller:
         global A, B, Xi, omega,n,x_hat,dt
         # try using ros timer to control the time Step , x and y vs time, mean square error for trajectory
         if i == 0:
+            stime1 = time.time()
             Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
             omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
             self.vel_msg.linear.x = Xi
             self.vel_msg.angular.z = omega
             self.vel_pub.publish(self.vel_msg)
-            stime1 = time.time()
             elapsed = time.time() - stime1
             while elapsed < dt:
                 elapsed = time.time() - stime1
         else:
-            print(i)
+            stime1 = time.time()
+            print("Step number " + str(i))
             x_temp = np.matmul(x_hat[:,i-1],A).reshape(-1, 1) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
             A_ext = np.array([[1, 0, -dt*Xi*np.sin(x_hat[2,i-1])],
                      [0, 1, dt*Xi*np.cos(x_hat[2,i-1])],
@@ -298,8 +313,6 @@ class lqr_controller:
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
-            robot_pos[0,i] = tbot_x
-            robot_pos[1,i] = tbot_y
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
             y[:,i] = [tbot_x, tbot_y, angles[2]];
@@ -327,11 +340,11 @@ class lqr_controller:
             self.vel_msg.linear.x = Xi
             self.vel_msg.angular.z = omega
             self.vel_pub.publish(self.vel_msg)
-            stime1 = time.time()
             elapsed = time.time() - stime1
             while elapsed < dt:
                 elapsed = time.time() - stime1
             print("Elapsed time:" + str(elapsed))
+            print("----------------------")
 if __name__ == "__main__":
     if os.name != 'nt':
         settings = termios.tcgetattr(sys.stdin)
