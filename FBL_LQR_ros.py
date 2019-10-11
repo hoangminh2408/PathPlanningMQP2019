@@ -21,8 +21,8 @@ from tf.transformations import euler_from_quaternion
 
 print("Initializing Controller Variables")
 print("................................")
-T = 150;
-num_steps = 300000;
+T = 50;
+num_steps = 50000;
 tgetkey = 0;
 
 n = 3;
@@ -259,6 +259,7 @@ class lqr_controller:
     def __init__(self):
         print("Creating LQR Controller Node")
         print("............................")
+        rospy.init_node('LQR_Controller')
         self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2)
         self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
         self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
