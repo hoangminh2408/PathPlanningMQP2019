@@ -26,7 +26,8 @@ from tf.transformations import euler_from_quaternion
 # robot.vel_pub.publish(robot.vel_msg)
 print("Initializing Controller...")
 T = 50
-num_steps = 50
+num_steps = 200
+tgetkey = 0
 n = 3
 m = 2
 p = 3
@@ -156,7 +157,7 @@ if rowR != m or colR != m:
 C_alpha = C[pMinusS-1,:];
 Sigma_v_alpha = Sigma_v[pMinusS-1, pMinusS-1];
 R_inv = np.linalg.inv(R);
-Sigma_v_inv = np.linalg.inv(Sigma_v);
+Sigma_v_inv = np.linalg.inv(Sigma_v);tgetkey
 
 x_hat = np.zeros((n, num_steps));
 x_alpha_hat = np.zeros((n,num_steps));
@@ -226,7 +227,7 @@ def getKey():
       return msvcrt.getch()
 
     tty.setraw(sys.stdin.fileno())
-    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
+    rlist, _, _ = select.select([sys.stdin], [], [], tgetkey)
     if rlist:
         key = sys.stdin.read(1)
     else:
@@ -242,6 +243,14 @@ def plotting():
     plt.ioff()
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
     plt.plot(robot_pos[0,:], robot_pos[1,:], label = 'Actual trajectory')
+
+    fig2 = plt.figure()
+    fig2.suptitle("Mean Square Error\n" + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
+    error = np.zeros(num_steps)
+    for i in range(0, num_steps):
+        error[i] = math.pow((np.linalg.norm(x_hat[0:2,i]-ref_traj[0:2,i])),2)/2;
+    plt.plot(error)
+
     plt.show()
 
 class pid_controller:
