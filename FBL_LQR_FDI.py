@@ -22,7 +22,7 @@ from tf.transformations import euler_from_quaternion
 
 print("Initializing Controller Variables")
 print("................................")
-T = 50;
+T = 100;
 num_steps = 50000;
 tgetkey = 0;
 random.seed(1)
@@ -167,6 +167,7 @@ P = np.zeros((n,n,num_steps));
 Sigma_x = np.zeros((n, n, num_steps));
 
 u = np.zeros((m, num_steps));
+real_y = np.zeros((p,num_steps));
 y = np.zeros((p, num_steps));
 
 x_p = np.zeros((n,1));
@@ -216,12 +217,12 @@ u[:,0] = np.reshape(uu5,(1,2))
 start_time = 0
 elapsed_time = 0
 def plotting():
-    global ref_traj, y, dt, T, num_steps, elapsed_time
+    global ref_traj, real_y, y, dt, T, num_steps, elapsed_time
     plt.ioff()
     fig1 = plt.figure()
     fig1.suptitle("Reference trajectory vs Actual trajectory\n " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
-    plt.plot(y[0,:], y[1,:], label = 'Actual trajectory')
+    plt.plot(real_y[0,:], real_y[1,:], label = 'Actual trajectory')
 
     fig2 = plt.figure()
     fig2.suptitle("Mean Square Error\n" + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
@@ -233,12 +234,12 @@ def plotting():
     fig3 = plt.figure()
     fig3.suptitle("Reference x vs Actual x")
     plt.plot(ref_traj[0,:], label = "Reference x")
-    plt.plot(y[0,:], label = "Actual x")
+    plt.plot(real_y[0,:], label = "Actual x")
 
     fig4 = plt.figure()
     fig4.suptitle("Reference y vs Actual y")
     plt.plot(ref_traj[1,:], label = "Reference y")
-    plt.plot(y[1,:], label = "Actual y")
+    plt.plot(real_y[1,:], label = "Actual y")
 
     plt.show()
 
@@ -308,12 +309,28 @@ class lqr_controller:
                      [0, 1, dt*Xi*np.cos(x_hat[2,i-1])],
                      [0, 0, 1]])
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
-            tbot_x = msg.pose.pose.position.x
-            tbot_y = msg.pose.pose.position.y
+            tbot_real_x = msg.pose.pose.position.x
+            tbot_real_y = msg.pose.pose.position.y
+            tbot_x = tbot_real_x
+            tbot_y = tbot_real_y
+            # FDI VERSION 1: small injection every step
+            # randnumber = random.uniform(-0.500, 0.500)
+            # tbot_x = tbot_x
+            # tbot_y = tbot_y + randnumber
+            # print("Random number: " + str(randnumber))
+            # FDI VERSION 2: (possibly) big injection every 500 steps
+            #
+            if i % 20 == 0:
+                randnumber1 = random.uniform(-1.5,1.5)
+                randnumber2 = random.uniform(-1.5,1.5)
+                tbot_x = tbot_x + randnumber1
+                tbot_y = tbot_y + randnumber2
+                print("Random number: " + str(randnumber1) + str(randnumber2))
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
-	    randnumber = random.uniform(0.05, 0.3)
-            y[:,i] = [tbot_x, tbot_y+randnumber, angles[2]]; #add random value to y
+            real_y[:,i] = [tbot_real_x, tbot_real_y, angles[2]];
+            y[:,i] = [tbot_x, tbot_y, angles[2]]; #add random value to y
+            print("TBOT position is : X = " + str(tbot_x) + " Y = " + str(tbot_y))
             z = y[:,i].reshape(-1,1)-np.matmul(C,x_temp);
             s_temp = np.matmul(np.matmul(C,Phi_temp),C.conj().transpose())+Sigma_v;
             Theta[:,:,i] = np.matmul(np.matmul(Phi_temp,C.conj().transpose()),np.linalg.inv(s_temp));
@@ -348,6 +365,7 @@ if __name__ == "__main__":
         settings = termios.tcgetattr(sys.stdin)
     try:
         Robot = lqr_controller()
+        start_time = time.time()
         for i in range(0, num_steps):
             key = getKey()
             if key == 'e':
@@ -360,6 +378,7 @@ if __name__ == "__main__":
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
+        elapsed_time = time.time() - start_time
         plotting()
         rospy.spin()
     except rospy.ROSInterruptException:

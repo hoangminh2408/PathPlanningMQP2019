@@ -310,7 +310,7 @@ class lqr_controller:
             tbot_y = msg.pose.pose.position.y
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
-            y[:,i] = [tbot_x, tbot_y, angles[2]];
+            y[:,i] = [tbot_x, tbot_y, angles[2]]; #add random value to y
             z = y[:,i].reshape(-1,1)-np.matmul(C,x_temp);
             s_temp = np.matmul(np.matmul(C,Phi_temp),C.conj().transpose())+Sigma_v;
             Theta[:,:,i] = np.matmul(np.matmul(Phi_temp,C.conj().transpose()),np.linalg.inv(s_temp));
@@ -344,6 +344,7 @@ if __name__ == "__main__":
     if os.name != 'nt':
         settings = termios.tcgetattr(sys.stdin)
     try:
+        start_time = time.time()
         Robot = lqr_controller()
         for i in range(0, num_steps):
             key = getKey()
@@ -357,6 +358,7 @@ if __name__ == "__main__":
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
+        elapsed_time = time.time() - start_time
         plotting()
         rospy.spin()
     except rospy.ROSInterruptException:

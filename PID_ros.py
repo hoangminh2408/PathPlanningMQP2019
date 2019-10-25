@@ -25,8 +25,8 @@ from tf.transformations import euler_from_quaternion
 # robot.vel_msg.angular.z = omega
 # robot.vel_pub.publish(robot.vel_msg)
 print("Initializing Controller...")
-T = 50
-num_steps = 200
+T = 100
+num_steps = 600
 tgetkey = 0
 n = 3
 m = 2
@@ -49,7 +49,8 @@ rd_tar = 1
 rd_obs = 1
 target = np.array([2, 0.001, 0])
 obs = np.array([-1, 1])
-t = np.linspace(0, 99, num = 100)
+t = np.linspace(0, 99, num = num_steps
+)
 
 kp1 = 1
 kp2 = 1
@@ -59,18 +60,17 @@ kd2 = 0.8
 x1 = 0.5*np.sin(t/10)
 x2 = 0.5*np.sin(t/20)
 
-parametric_func = np.zeros((2,100))
+parametric_func = np.zeros((2,num_steps))
 parametric_func[0] = x1
 parametric_func[1] = x2
 
-dt = float(T)/num_steps
+dt = float(T)/float(num_steps);
 s = np.zeros((n, num_steps))
 b = np.zeros((n,n,num_steps))
 
 s[:,num_steps-1]=[0,0,0]
 b[:,:,num_steps-1]=np.zeros(3)
 degree = 3
-dt = T/num_steps
 
 g_D = rd_tar^2
 g_U = rd_obs^2
@@ -181,7 +181,8 @@ Sigma_x_p = np.zeros((n,n));
 
 error = np.zeros((1,num_steps));
 cost = np.zeros((1,num_steps));
-
+start_time = 0
+elapsed_time = 0
 
 finish = False;
 # set(gcf,'CurrentCharacter','@'); % set to a dummy character
@@ -215,12 +216,7 @@ for i in range (1,num_steps):
 
 u[0,0] = ref_traj_db_dot[0,0] + kp1*(ref_traj[0,0]-y[0,0])
 u[1,0] = ref_traj_db_dot[1,0] + kp2*(ref_traj[1,0]-y[1,0])
-Xi = u[0,0]*np.cos(y[2,0])*dt+u[1,0]*np.sin(y[2,0])*dt
-omega = (u[1,0]*np.cos(y[2,0])-u[0,0]*np.sin(y[2,0]))/Xi
-if omega > 0.3:
-    omega = 0.3
-elif omega < -0.3:
-    omega = -0.3
+
 
 def getKey():
     if os.name == 'nt':
@@ -287,37 +283,54 @@ class pid_controller:
 
 
     # Odom
-    def pid_loop(self, msg,i):
+    def pid_loop(self, msg, i):
         global B, robot_pos
-        rospy.sleep(0.5)
-        print("Step number: " + str(i))
-        tbot_x = msg.pose.pose.position.x
-        tbot_y = msg.pose.pose.position.y
-        print("Tbot x is: " + str(tbot_x))
-        print("Tbot y is: " + str(tbot_y))
-        robot_pos[0,i] = tbot_x
-        robot_pos[1,i] = tbot_y
-        quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
-        angles = euler_from_quaternion(quat)
-        print(angles)
-        y[:,i] = [tbot_x, tbot_y, angles[2]];
-        x_temp = np.matmul(A,x_hat[:,i-1]) + np.matmul(B,u[:,i-1]);
-        x_hat[:,i] = x_temp + np.matmul(Theta[:,:,i],(y[:,i]-np.matmul(C,x_temp)));
-        B = np.array([[np.cos(y[2,i]),0],[np.sin(y[2,i]),0],[0,1]])
-        u[0,i] = ref_traj_db_dot[0,i] + kp1*(ref_traj[0,i]-y[0,i]) + kd1*(ref_traj_dot[0,i]-y[0,i]+y[0,i-1]);
-        u[1,i] = ref_traj_db_dot[1,i] + kp2*(ref_traj[1,i]-y[1,i]) + kd2*(ref_traj_dot[1,i]-y[1,i]+y[1,i-1]);
-        Xi = u[0,i]*np.cos(y[2,i])*dt+u[1,i]*np.sin(y[2,i])*dt
-        omega = (u[1,i]*np.cos(y[2,i])-u[0,i]*np.sin(y[2,i]))/Xi
-        # if omega > 0.3:
-        #  omega = 0.3
-        # elif omega < -0.3:
-        #  omega = -0.3
-        if y[2,i] > math.pi or y[2,i] < -math.pi:
-         y[2,i] = y[2,i] - 2*math.pi*np.sign(y[2,i]);
-        # error[i] = math.pow(np.linalg.norm(y[0:2,i] - ref_traj[0:2,i]),2)/2
-        self.vel_msg.linear.x = Xi
-        self.vel_msg.angular.z = omega
-        self.vel_pub.publish(self.vel_msg)
+        if i == 0:
+            stime1 = time.time()
+            Xi = u[0,0]*np.cos(y[2,0])*dt+u[1,0]*np.sin(y[2,0])*dt
+            omega = (u[1,0]*np.cos(y[2,0])-u[0,0]*np.sin(y[2,0]))/Xi
+            if omega > 0.3:
+                omega = 0.3
+            elif omega < -0.3:
+                omega = -0.3
+            self.vel_msg.linear.x = Xi
+            self.vel_msg.angular.z = omega
+            self.vel_pub.publish(self.vel_msg)
+            elapsed = time.time() - stime1
+            while elapsed < dt:
+                elapsed = time.time() - stime1
+        else:
+            stime1 = time.time()
+            print("Step number: " + str(i))
+            tbot_x = msg.pose.pose.position.x
+            tbot_y = msg.pose.pose.position.y
+            robot_pos[0,i] = tbot_x
+            robot_pos[1,i] = tbot_y
+            quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
+            angles = euler_from_quaternion(quat)
+            y[:,i] = [tbot_x, tbot_y, angles[2]];
+            x_temp = np.matmul(A,x_hat[:,i-1]) + np.matmul(B,u[:,i-1]);
+            x_hat[:,i] = x_temp + np.matmul(Theta[:,:,i],(y[:,i]-np.matmul(C,x_temp)));
+            B = np.array([[np.cos(y[2,i]),0],[np.sin(y[2,i]),0],[0,1]])
+            u[0,i] = ref_traj_db_dot[0,i] + kp1*(ref_traj[0,i]-y[0,i]) + kd1*(ref_traj_dot[0,i]-y[0,i]+y[0,i-1]);
+            u[1,i] = ref_traj_db_dot[1,i] + kp2*(ref_traj[1,i]-y[1,i]) + kd2*(ref_traj_dot[1,i]-y[1,i]+y[1,i-1]);
+            Xi = u[0,i]*np.cos(y[2,i])*dt+u[1,i]*np.sin(y[2,i])*dt
+            omega = (u[1,i]*np.cos(y[2,i])-u[0,i]*np.sin(y[2,i]))/Xi
+            # if omega > 0.3:
+            #  omega = 0.3
+            # elif omega < -0.3:
+            #  omega = -0.3
+            if y[2,i] > math.pi or y[2,i] < -math.pi:
+             y[2,i] = y[2,i] - 2*math.pi*np.sign(y[2,i]);
+            # error[i] = math.pow(np.linalg.norm(y[0:2,i] - ref_traj[0:2,i]),2)/2
+            self.vel_msg.linear.x = Xi
+            self.vel_msg.angular.z = omega
+            self.vel_pub.publish(self.vel_msg)
+            elapsed = time.time() - stime1
+            while elapsed < dt:
+                elapsed = time.time() - stime1
+            print("Elapsed time:" + str(elapsed))
+            print("----------------------")
         # print(self.vel_msg)
 
 if __name__ == "__main__":
@@ -327,7 +340,8 @@ if __name__ == "__main__":
         Robot = pid_controller()
         # controller_init(Robot)
         # Robot.odom_callback(Robot.odom_msg)
-        for i in range(1, num_steps):
+        start_time = time.time()
+        for i in range(0, num_steps):
             key = getKey()
             if key == 'e':
                 Robot.vel_msg.linear.x = 0
@@ -335,17 +349,12 @@ if __name__ == "__main__":
                 Robot.vel_pub.publish(Robot.vel_msg)
                 exit()
                 break
-            if Robot.odom_updated:
-                # print(Robot.odom_msg)
-                Robot.pid_loop(Robot.odom_msg,i)
-                Robot.odom_updated = False
-            else:
-                num_steps = num_steps - 1
+            Robot.pid_loop(Robot.odom_msg,i)
         Robot.vel_msg.linear.x = 0
         Robot.vel_msg.angular.z = 0
         Robot.vel_pub.publish(Robot.vel_msg)
+        elapsed_time = time.time() - start_time
         plotting()
-        exit()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
