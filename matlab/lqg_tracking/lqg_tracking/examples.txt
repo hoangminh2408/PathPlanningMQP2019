@@ -1,0 +1,214 @@
+lqgRT.m
+1. segment reference trajectory
+Final time of the system: 1
+Number of iterations during T: 1e4
+Dimension of the system state: 2
+Dimension of the system input: 2
+Dimension of the system observation: 2
+Index list of the secure sensors(row vector): [2]
+nxn state matrix: eye(2)
+nxm input matrix: eye(2)
+pxn output matrix: [1 1; 1 -1]
+nxn autocorrelation matrix: eye(2)
+pxp autocorrelation matrix: eye(2)
+nxn cost matrix: eye(2)
+mxm cost matrix: 1e-3*eye(2)
+Start point: [-5; 5]
+Radius of the target area: 1
+Radius of the obstacle area: 1
+Center of the target area: [0; 5]
+Center of the obstacle area: [0; 2.5]
+Domain of t(in terms of start:step:end): -5:(5/(1e4-1)):0
+1th Parametric function(using t as the parameter): t
+2th Parametric function(using t as the parameter): 5*ones(size(t))
+Degree of the polyfit for the reference trajectory: 5
+
+2. broken line reference trajectory
+Final time of the system: 1
+Number of iterations during T: 1e4
+Dimension of the system state: 2
+Dimension of the system input: 2
+Dimension of the system observation: 2
+Index list of the secure sensors(row vector): [2]
+nxn state matrix: eye(2)
+nxm input matrix: eye(2)
+pxn output matrix: [1 1; 1 -1]
+nxn autocorrelation matrix: eye(2)
+pxp autocorrelation matrix: eye(2)
+nxn cost matrix: eye(2)
+mxm cost matrix: 1e-3*eye(2)
+Start point: [0; 0]
+Radius of the target area: 1
+Radius of the obstacle area: 1
+Center of the target area: [0; 5]
+Center of the obstacle area: [0; 2.5]
+Domain of t(in terms of start:step:end): 0:(5/(1e4-1)):5
+1th Parametric function(using t as the parameter): t.*(t<=2.5)+(-t+5).*(t>2.5)
+2th Parametric function(using t as the parameter): t
+Degree of the polyfit for the reference trajectory: 5
+
+3. cubic curve reference trajectory
+Final time of the system: 1
+Number of iterations during T: 1e4
+Dimension of the system state: 1
+Dimension of the system input: 1
+Dimension of the system observation: 1
+Index list of the secure sensors(row vector): [1]
+nxn state matrix: 1
+nxm input matrix: 1
+pxn output matrix: 1
+nxn autocorrelation matrix: 1
+pxp autocorrelation matrix: 1
+nxn cost matrix: 1
+mxm cost matrix: 1e-3
+Start point: 10
+Radius of the target area: 1
+Radius of the obstacle area: 1
+Center of the target area: 5
+Center of the obstacle area: 2.5
+Domain of t(in terms of start:step:end): power(10,1/3):(power(5,1/3)-power(10,1/3))/(1e4-1):power(5,1/3)
+1th Parametric function(using t as the parameter): t.^3
+Degree of the polyfit for the reference trajectory: 5
+
+4. hyperbola reference trajectory
+Final time of the system: 1
+Number of iterations during T: 1e4
+Dimension of the system state: 2
+Dimension of the system input: 2
+Dimension of the system observation: 2
+Index list of the secure sensors(row vector): [2]
+nxn state matrix: eye(2)
+nxm input matrix: eye(2)
+pxn output matrix: [1 1; 1 -1]
+nxn autocorrelation matrix: eye(2)
+pxp autocorrelation matrix: eye(2)
+nxn cost matrix: eye(2)
+mxm cost matrix: 1e-3*eye(2)
+Start point: [0; 0]
+Radius of the target area: 1
+Radius of the obstacle area: 1
+Center of the target area: [0; 5]
+Center of the obstacle area: [0; 2.5]
+Domain of t(in terms of start:step:end): log(sqrt(2)-1):1.7629e-04:log(sqrt(2)+1)
+1th Parametric function(using t as the parameter): 3*cosh(t)-3*sqrt(2)
+2th Parametric function(using t as the parameter): 2.5*sinh(t)+2.5
+Degree of the polyfit for the reference trajectory: 5
+
+
+lqgRT_v2.m
+1. segment reference trajectory
+t = -5:(5/(1e4-1)):0;
+x1 = t;
+x2 = 5*ones(size(t));
+lqgRT_v2(1, 1e4, 2, 2, 2, [2], eye(2), eye(2), [1 1; 1 -1], eye(2), eye(2), eye(2), 1e-3*eye(2), [-5; 5], 1, 1, [0; 5], [0; 2.5], t, [x1; x2], 5);
+
+2. broken line reference trajectory
+t = 0:(5/(1e4-1)):5;
+x1 = t.*(t<=2.5)+(-t+5).*(t>2.5);
+x2 = t;
+lqgRT_v2(1, 1e4, 2, 2, 2, [2], eye(2), eye(2), [1 1; 1 -1], eye(2), eye(2), eye(2), 1e-3*eye(2), [0; 0], 1, 1, [0; 5], [0; 2.5], t, [x1; x2], 5);
+
+3. cubic curve reference trajectory
+t = power(10,1/3):(power(5,1/3)-power(10,1/3))/(1e4-1):power(5,1/3);
+x1 = t.^3;
+lqgRT_v2(1, 1e4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1e-3, 10, 1, 1, 5, 2.5, t, x1, 5);
+
+4. hyperbola reference trajectory
+t = log(sqrt(2)-1):1.7629e-04:log(sqrt(2)+1);
+x1 = 3*cosh(t)-3*sqrt(2);
+x2 = 2.5*sinh(t)+2.5;
+lqgRT_v2(1, 1e4, 2, 2, 2, [2], eye(2), eye(2), [1 1; 1 -1], eye(2), eye(2), eye(2), 1e-3*eye(2), [0; 0], 1, 1, [0; 5], [0; 2.5], t, [x1; x2], 5);
+
+
+lqgRT_v3.m
+1. segment reference trajectory
+1
+1e4
+2
+2
+2
+[2]
+eye(2)
+eye(2)
+[1 1; 1 -1]
+eye(2)
+eye(2)
+eye(2)
+1e-3*eye(2)
+[-5; 5]
+1
+1
+[0; 5]
+[0; 2.5]
+-5:(5/(1e4-1)):0
+[t; 5*ones(size(t))]
+5
+
+2. broken line reference trajectory
+1
+1e4
+2
+2
+2
+[2]
+eye(2)
+eye(2)
+[1 1; 1 -1]
+eye(2)
+eye(2)
+eye(2)
+1e-3*eye(2)
+[0; 0]
+1
+1
+[0; 5]
+[0; 2.5]
+0:(5/(1e4-1)):5
+[t.*(t<=2.5)+(-t+5).*(t>2.5); t]
+5
+
+3. cubic curve reference trajectory
+1
+1e4
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1
+1e-3
+10
+1
+1
+5
+2.5
+power(10,1/3):(power(5,1/3)-power(10,1/3))/(1e4-1):power(5,1/3)
+[t.^3]
+5
+
+4. hyperbola reference trajectory
+1
+1e4
+2
+2
+2
+[2]
+eye(2)
+eye(2)
+[1 1; 1 -1]
+eye(2)
+eye(2)
+eye(2)
+1e-3*eye(2)
+[0; 0]
+1
+1
+[0; 5]
+[0; 2.5]
+log(sqrt(2)-1):1.7629e-04:log(sqrt(2)+1)
+[3*cosh(t)-3*sqrt(2); 2.5*sinh(t)+2.5]
+5
