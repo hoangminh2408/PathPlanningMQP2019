@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import time
 import sys, select, os
 import random
+import matlab.engine
 if os.name == 'nt':
   import msvcrt
 else:
@@ -19,6 +20,8 @@ from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu, LaserScan
 from tf.transformations import euler_from_quaternion
+
+eng = matlab.engine.start_matlab() #Matlab script has to be in same directory as python script?
 
 print("Initializing Controller Variables")
 print("................................")
@@ -383,4 +386,3 @@ if __name__ == "__main__":
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
-
