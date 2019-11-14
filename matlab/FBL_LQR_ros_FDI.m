@@ -242,7 +242,7 @@ Sigma_v_inv = inv(Sigma_v);
 G = Sigma_w;
 
 P = zeros([n,n,num_steps]);
-
+P_l = zeros([n_l,n_l,num_steps]);
 
 Sigma_x = zeros(n, n, num_steps);
 u = zeros(m, num_steps);
@@ -293,5 +293,5 @@ end
 
 
 %% calculate gamma %%
-% gamma = InvokeSafetyBarrier(A_l,B_l,C_l_alpha,Sigma_w_l,Sigma_v_l,Sigma_v_l_alpha,R,K,Phi_l_alpha(:,:,num_steps),Theta_l_alpha(:,:,num_steps),n_l,m_l,p_l,s_coeff,degree,start_point_l,g_U,g_D);
+gamma = InvokeSafetyBarrier(A_l,B_l,C_l_alpha,Sigma_w_l,Sigma_v_l,Sigma_v_l_alpha,R,K,Phi_l_alpha(:,:,num_steps),Theta_l_alpha(:,:,num_steps),P_l(:,:,num_steps),n_l,m_l,p_l,s_coeff,degree,start_point_l,g_U,g_D)
 gamma = 10;
