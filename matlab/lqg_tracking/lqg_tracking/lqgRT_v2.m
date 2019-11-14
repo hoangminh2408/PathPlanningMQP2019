@@ -55,11 +55,11 @@ if num_steps <= 1000
     %         ref_traj(j,:) = [ref_traj(j,1:end-1) tmp];
     %     end
     % end
-    
+
     for i = 1:1:n
         tmp = double.empty(1,0);
         for j = 1:1:(num_steps-1)
-            
+
             tmp = [tmp(1:(end-1)) linspace(temp_ref(i,j),temp_ref(i,j+1))];
             disp(j);
             disp(size(tmp));
@@ -79,7 +79,7 @@ s_coeff = zeros(n,degree+1);
 for i = 1:1:n
     s_coeff(i,:) = polyfit(t, ref_traj(i,:), degree);
 end
-% p1 = polyfit(t, ref_traj(1,:), degree); 
+% p1 = polyfit(t, ref_traj(1,:), degree);
 % p2 = polyfit(t, ref_traj(2,:), degree);
 
 % smooth the init ref_traj via polyfit
@@ -153,8 +153,8 @@ end
 % C_alpha = C(1,:);
 % Q = eye(n);
 % R = 1e-3*eye(n); % eye(n)
-C_alpha = C(pMinusS,:);
-Sigma_v_alpha = Sigma_v(pMinusS, pMinusS);
+C_alpha = C(pMinusS-1,:);
+Sigma_v_alpha = Sigma_v(pMinusS-1, pMinusS-1);
 R_inv = inv(R);
 P = zeros([n,n,num_steps]);
 
@@ -241,13 +241,13 @@ Theta_alpha
 %% calculate gamma %%
 %u_alpha = -0.5*R_inv*B'*P(:,:,1)*x_alpha_hat(:,1) - 0.5*R_inv*B'*s(:,1);
 
-gamma = InvokeSafetyBarrier(A,B,C_alpha,Sigma_w,Sigma_v,Sigma_v_alpha,R,K,Phi_alpha,Theta_alpha,n,m,p,s_coeff,degree,start_point,g_U,g_D);
-
+% gamma = InvokeSafetyBarrier(A,B,C_alpha,Sigma_w,Sigma_v,Sigma_v_alpha,R,K,Phi_alpha,Theta_alpha,n,m,p,s_coeff,degree,start_point,g_U,g_D);
+gamma = 9.9216
 %gamma = 10000;
 
 
 %% reinitialize Phi%%
-Phi = zeros(n); 
+Phi = zeros(n);
 Phi_alpha = zeros(n);
 
 
@@ -271,12 +271,11 @@ for i = 2:num_steps
     [u_ast,fval,eflag,output,lambda] = fmincon(fun,x0,...
         [],[],[],[],[],[],nonlconstr,options);
     opt_time = toc(opt_start);
-    
     % state space dynamics
     w = normrnd(0,1,n,1); % not exist
-    dxdt = A*x(:,i-1) + B*u_ast + w; 
+    dxdt = A*x(:,i-1) + B*u_ast + w;
     x(:,i) = x(:,i-1) + dxdt*dt;
-    
+
     % observation
     v = normrnd(0,1,p,1); % randn(n,1)
     v_alpha = v(pMinusS,:);
@@ -284,7 +283,7 @@ for i = 2:num_steps
     attack(pMinusS,1) = 0;
     y = C*x(:,i) + v + attack;
     y_alpha = C_alpha*x(:,i) + v_alpha;
-    
+
     % Phi, Theta
     dPhi_alpha_dt = A*Phi_alpha + Phi_alpha*A' + Sigma_w - Phi_alpha*C_alpha'*inv(Sigma_v_alpha)*C_alpha*Phi_alpha';
     %dPhi_alpha_dt = A*Phi_alpha + Phi_alpha*A' + Sigma_w - Theta_alpha*C_alpha*Sigma_v_alpha*C_alpha'*Theta_alpha';
@@ -294,22 +293,22 @@ for i = 2:num_steps
     Theta_alpha = Phi_alpha*C_alpha'*inv(Sigma_v_alpha);
     Phi = Phi + dt*dPhi_dt;
     Theta = Phi*C'*Sigma_v_inv;
-    
+
     % estimate
     dxhat_dt = A*x_hat(:,i-1) + B*u_ast + Theta*(y - C*x_hat(:,i-1));
     x_hat(:,i) = x_hat(:,i-1) + dt*dxhat_dt;
-    
+
     dxhat_alpha_dt = A*x_alpha_hat(:,i-1) + B*u_ast + Theta_alpha*(y_alpha - C_alpha*x_alpha_hat(:,i-1));
     x_alpha_hat(:,i) = x_alpha_hat(:,i-1) + dt*dxhat_alpha_dt;
-    
+
     %negative_dPdt = P*A + A'*P - P*B*R_inv*B'*P + Q; % repeat
     %P = P-negative_dPdt*dt;
-    
+
     x_real(:,i) = x_real(:,i-1) + dt*(A*x_real(:,i-1) + B*u_ast);
-    
+
     disp(i);
 end
-    
+
 
 %% figure %%
 t = 0:1:(num_steps-1);

@@ -318,7 +318,7 @@ P = b-Q;
 % end
 
 % for i = num_steps-1:-1:1
-%     P(:,:,i,j) = P(:,:,i+1,j) + dt*(A'*P(:,:,i+1,j) + P(:,:,i+1,j)*A - P(:,:,i+1,j)*B_temp*R_inv*B_temp'*P(:,:,i+1,j) + Q);
+%     P(:,:,i,j) = P(:,:,i+1,j) + dt*(A'*P(:,:,i+1,j) + P(:,:,i+1,j)*A - P(:,:,i+1,j)*B_temp*R_inv*B_temp'*P(:,:,i+1,j) + );
 %     dsdt = (A' - P(:,:,i,j)*B_temp*R_inv*B_temp')'*s(:,i+1,j) - Q*ref_traj(:,i+1);
 %     s(:,i,j) = s(:,i+1,j) + dsdt*dt;
 % end
