@@ -1,11 +1,10 @@
 #!/usr/bin/env python
+import matlab.engine
 import numpy as np
 import math
 import copy
 import time
 # import matplotlib.pyplot as plt
-import time
-import matlab.engine
 import sys, select, os
 if os.name == 'nt':
   import msvcrt
@@ -88,8 +87,10 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
         dsdt = np.matmul(dsdt, s[:,i+1]) - np.matmul(Q,ref_traj[:,i+1])
         s[:,i] = s[:,i+1] + dsdt*dt
     BG = np.hstack((B,G))
+    start_time = time.time()
     K = np.asarray(eng.KalmanOutput(matlab.double(A.tolist()), matlab.double(BG.tolist()), matlab.double(C.tolist()), 0, matlab.double(Q.tolist()), matlab.double(R.tolist()), 0, nargout = 1))
-
+    elapsed_time = time.time() - start_time
+    print("Kalman elapsed: " + str(elapsed_time))
     Phi_alpha_prev = Phi_alpha + 0.0001
     Theta_alpha_prev = Theta_alpha + 0.0001
     Phi_alpha_bool =  abs(Phi_alpha - Phi_alpha_prev) >= 0.001
@@ -107,7 +108,9 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
     for i in range(1, num_steps):
         u_alpha = np.matmul(np.matmul(np.matmul(-0.5*R_inv,B_h),P[:,:,i-1]),x_alpha_hat[:,i-1]) - np.matmul(np.matmul(0.5*R_inv,B_h), s[:,i-1])
         u_alpha = np.reshape(u_alpha,(2,1))
+        start_time = time.time()
         u_ast = np.asarray(eng.QCQPSolver(matlab.double(B.tolist()),matlab.double(R.tolist()),matlab.double(u_alpha.tolist()),gamma,matlab.double(P.tolist()),matlab.double(x_hat.tolist()),matlab.double(s.tolist()),i+1,n,matlab.double(start_point.tolist()), nargout = 1))
+        elapsed_time = time.time() - start_time
         w = np.random.normal(0,1,(n,1))
         dxdt = np.reshape(np.matmul(A, x[:,i-1]),(2,1)) + np.matmul(B,u_ast) + w
         x[:,i] = np.reshape(np.reshape(x[:,i-1],(2,1)) + dxdt*dt,2)
@@ -131,6 +134,8 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
         dxhat_alpha_dt = np.reshape(np.matmul(A,x_alpha_hat[:,i-1]),(2,1)) + np.matmul(B, u_ast) + np.matmul(Theta_alpha, (y_alpha - np.matmul(C_alpha, x_alpha_hat[:,i-1])))
         x_alpha_hat[:,i] = np.reshape(np.reshape(x_alpha_hat[:,i-1],(2,1)) + dt*dxhat_alpha_dt,2)
         x_real[:,i] = np.reshape(np.reshape(x_real[:,i-1],(2,1)) + dt*(np.reshape(np.matmul(A,x_real[:,i-1]),(2,1)) + np.matmul(B,u_ast)),2)
+
+        print("Time elapsed: " + str(elapsed_time))
         print(i)
 
 if __name__ == "__main__":
