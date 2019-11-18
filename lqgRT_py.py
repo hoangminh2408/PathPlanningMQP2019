@@ -10,7 +10,8 @@ if os.name == 'nt':
   import msvcrt
 else:
   import tty, termios
-
+import cvxpy as cvx
+import qcqp
 # T              -- the final time of the system
 # dt             -- the time duration of each iteration
 # num_steps      -- the number of iterations during T, 1000 is not enough
@@ -108,7 +109,15 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
         u_alpha = np.matmul(np.matmul(np.matmul(-0.5*R_inv,B_h),P[:,:,i-1]),x_alpha_hat[:,i-1]) - np.matmul(np.matmul(0.5*R_inv,B_h), s[:,i-1])
         u_alpha = np.reshape(u_alpha,(2,1))
         start_time = time.time()
-        u_ast = eng.QCQPSolver(matlab.double(B.tolist()),matlab.double(R.tolist()),matlab.double(u_alpha.tolist()),gamma,matlab.double(P.tolist()),matlab.double(x_hat.tolist()),matlab.double(s.tolist()),i+1,n,matlab.double(start_point.tolist()), nargout = 1)
+        z = cvx.Variable(2)
+
+        obj = cvx.quad_form(z,R) + np.matmul(np.matmul(np.matmul(x_hat[:,i-1].conj().transpose(), P[:,:,i-1]),B.conj().transpose()),z) + np.matmul(np.matmul(s[:,i],B.conj().transpose()),z)
+        constr = [np.matmul((z - u_alpha).conj().transpose(),(z - u_alpha)) <= math.pow(gamma,2)]
+        prob = cvx.Problem(cvx.Minimize(obj),constr)
+        prob.solve()
+        u_ast = prob.value
+        print(u_ast)
+        # u_ast = eng.QCQPSolver(matlab.double(B.tolist()),matlab.double(R.tolist()),matlab.double(u_alpha.tolist()),gamma,matlab.double(P.tolist()),matlab.double(x_hat.tolist()),matlab.double(s.tolist()),i+1,n,matlab.double(start_point.tolist()), nargout = 1)
         elapsed_time = time.time() - start_time
         w = np.random.normal(0,1,(n,1))
         dxdt = np.reshape(np.matmul(A, x[:,i-1]),(2,1)) + np.matmul(B,u_ast) + w
