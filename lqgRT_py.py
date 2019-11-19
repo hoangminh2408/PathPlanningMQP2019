@@ -149,6 +149,7 @@ def plotting(ref_traj, x_real):
     fig1 = plt.figure()
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
     plt.plot(x_real[0,:], x_real[1,:], label = 'Actual trajectory')
+    plt.show()
 if __name__ == "__main__":
     t = np.linspace(-5,0,10000);
     # t = np.reshape(t,(1,10000))
