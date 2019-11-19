@@ -11,7 +11,6 @@ if os.name == 'nt':
 else:
   import tty, termios
 import cvxpy as cvx
-import qcqp
 # T              -- the final time of the system
 # dt             -- the time duration of each iteration
 # num_steps      -- the number of iterations during T, 1000 is not enough
@@ -88,7 +87,8 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
         s[:,i] = s[:,i+1] + dsdt*dt
     BG = np.hstack((B,G))
     start_time = time.time()
-    K = np.asarray(eng.KalmanOutput(matlab.double(A.tolist()), matlab.double(BG.tolist()), matlab.double(C.tolist()), 0, matlab.double(Q.tolist()), matlab.double(R.tolist()), 0, nargout = 1))
+    K = np.array([[22.8662692463450,22.8662692463450],[22.8662692463450,22.8662692463450]])
+    # K = np.asarray(eng.KalmanOutput(matlab.double(A.tolist()), matlab.double(BG.tolist()), matlab.double(C.tolist()), 0, matlab.double(Q.tolist()), matlab.double(R.tolist()), 0, nargout = 1))
     elapsed_time = time.time() - start_time
     print("Kalman elapsed: " + str(elapsed_time))
     Phi_alpha_prev = Phi_alpha + 0.0001
@@ -110,12 +110,10 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
         u_alpha = np.reshape(u_alpha,(2,1))
         start_time = time.time()
         z = cvx.Variable(2)
-
-        obj = cvx.quad_form(z,R) + np.matmul(np.matmul(np.matmul(x_hat[:,i-1].conj().transpose(), P[:,:,i-1]),B.conj().transpose()),z) + np.matmul(np.matmul(s[:,i],B.conj().transpose()),z)
-        constr = [np.matmul((z - u_alpha).conj().transpose(),(z - u_alpha)) <= math.pow(gamma,2)]
-        prob = cvx.Problem(cvx.Minimize(obj),constr)
+        obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(np.matmul(x_hat[:,i-1].T, P[:,:,i-1]),B.T)*z + np.matmul(s[:,i].T,B)*z)
+        prob = cvx.Problem(obj,[0.5*cvx.quad_form(z,np.eye(2))+(-2*u_alpha.T*z) + (np.matmul(u_alpha.T,u_alpha)) - math.pow(gamma,2) <= 0])
         prob.solve()
-        u_ast = prob.value
+        u_ast = np.reshape(2*z.value,(2,1))
         print(u_ast)
         # u_ast = eng.QCQPSolver(matlab.double(B.tolist()),matlab.double(R.tolist()),matlab.double(u_alpha.tolist()),gamma,matlab.double(P.tolist()),matlab.double(x_hat.tolist()),matlab.double(s.tolist()),i+1,n,matlab.double(start_point.tolist()), nargout = 1)
         elapsed_time = time.time() - start_time
@@ -145,13 +143,10 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
 
         print("Time elapsed: " + str(elapsed_time))
         print(i)
-        if i == 3:
-            exit()
-    plotting()
-def plotting():
+    plotting(ref_traj, x_real)
+def plotting(ref_traj, x_real):
     plt.ioff()
     fig1 = plt.figure()
-    fig1.suptitle("Reference trajectory vs Actual trajectory\n " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps))
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
     plt.plot(x_real[0,:], x_real[1,:], label = 'Actual trajectory')
 if __name__ == "__main__":

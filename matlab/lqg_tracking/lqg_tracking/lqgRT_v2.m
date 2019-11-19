@@ -270,12 +270,13 @@ for i = 2:num_steps
     x0 = start_point;
     [u_ast,fval,eflag,output,lambda] = fmincon(fun,x0,...
         [],[],[],[],[],[],nonlconstr,options);
+    disp(u_ast)
     opt_time = toc(opt_start);
     % state space dynamics
     w = normrnd(0,1,n,1); % not exist
     dxdt = A*x(:,i-1) + B*u_ast + w;
     x(:,i) = x(:,i-1) + dxdt*dt;
-
+    
     % observation
     v = normrnd(0,1,p,1); % randn(n,1)
     v_alpha = v(pMinusS,:);

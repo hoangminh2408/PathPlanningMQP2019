@@ -136,8 +136,6 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
 
         print("Time elapsed: " + str(elapsed_time))
         print(i)
-        if i == 3:
-            exit()
     plotting()
 def plotting():
     plt.ioff()
