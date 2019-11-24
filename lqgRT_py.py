@@ -89,8 +89,6 @@ def lqgRT_v2(T, num_steps, n, m, p, pMinusS, A, B, C, Sigma_w, Sigma_v, Q, R, st
     start_time = time.time()
     K = np.array([[22.8662692463450,22.8662692463450],[22.8662692463450,22.8662692463450]])
     # K = np.asarray(eng.KalmanOutput(matlab.double(A.tolist()), matlab.double(BG.tolist()), matlab.double(C.tolist()), 0, matlab.double(Q.tolist()), matlab.double(R.tolist()), 0, nargout = 1))
-    elapsed_time = time.time() - start_time
-    print("Kalman elapsed: " + str(elapsed_time))
     Phi_alpha_prev = Phi_alpha + 0.0001
     Theta_alpha_prev = Theta_alpha + 0.0001
     Phi_alpha_bool =  abs(Phi_alpha - Phi_alpha_prev) >= 0.001
