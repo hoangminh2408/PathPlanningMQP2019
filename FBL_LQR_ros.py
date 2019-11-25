@@ -8,7 +8,6 @@ from tf.transformations import euler_from_quaternion
 import copy
 import time
 import matplotlib.pyplot as plt
-import time
 import sys, select, os
 if os.name == 'nt':
   import msvcrt
@@ -363,4 +362,3 @@ if __name__ == "__main__":
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
-
