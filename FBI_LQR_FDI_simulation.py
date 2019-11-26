@@ -17,6 +17,7 @@ from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu, LaserScan
 from tf.transformations import euler_from_quaternion
+from pathplanningmqp.msg import transform
 import cvxpy as cvx
 # from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 # from nav_msgs.msg import Odometry
@@ -26,8 +27,8 @@ import cvxpy as cvx
 print("Initializing Controller Variables")
 print("................................")
 # eng = matlab.engine.start_matlab()
-T = 50;
-num_steps = 50000;
+T = 20;
+num_steps = 200;
 tgetkey = 0;
 
 rd_tar = 1;
@@ -137,7 +138,8 @@ s_coeff = np.zeros((n,degree + 1))
 for i in range(0,n):
     s_coeff[i,:] = np.polyfit(t, ref_traj[i,:], degree)
 for i in range(0,n):
-    ref_traj[i,:] = np.polyval(s_coeff[i,:], t)
+    # ref_traj[i,:] = np.polyval(s_coeff[i,:], t)
+    break
 
 if dt <= 0:
     dt = 1e-4;
@@ -248,8 +250,7 @@ for i in range(num_steps - 2, -1, -1):
     dsdt = (A.T - 0.5*np.matmul(np.matmul(np.matmul(P[:,:,i],B),R_inv),B.T))
     dsdt = np.matmul(dsdt, s[:,i+1]) - np.matmul(Q,ref_traj[:,i+1])
     s[:,i] = s[:,i+1] + dsdt*dt
-print("P = " + str(P))
-print("s = " + str(s))
+
 Phi = np.zeros((n,n,num_steps))
 Phi_alpha = np.zeros((n,n,num_steps))
 Theta = np.zeros((n,p,num_steps))
@@ -264,7 +265,7 @@ for i in range(1, num_steps):
     Phi[:,:,i] = Phi[:,:,i-1] + dt*dPhi_dt
     Theta[:,:,i] = np.matmul(np.matmul(Phi[:,:,i],C.T),Sigma_v_inv)
 
-gamma = 10000 #CHANGE GAMMA
+gamma = 20 #CHANGE GAMMA
 first_step_angle = np.arctan((ref_traj[1,1] - ref_traj[1,0])/(ref_traj[0,1] - ref_traj[0,0]));
 init_angle = 0;
 theta = first_step_angle-init_angle;
@@ -275,24 +276,55 @@ Xi = np.zeros((1,num_steps))
 omega = np.zeros((1,num_steps))
 # DONE SETTING UP Variables
 
+def plotting():
+    global ref_traj, y, dt, T, num_steps, elapsed_time
+    plt.ioff()
+    fig1 = plt.figure()
+    fig1.suptitle("Reference trajectory vs Actual trajectory\n " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
+    plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
+    plt.plot(y[0,:], y[1,:], label = 'Actual trajectory')
+
+    fig2 = plt.figure()
+    fig2.suptitle("Mean Square Error\n" + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
+    error = np.zeros(num_steps)
+    for i in range(0, num_steps):
+        error[i] = math.pow((np.linalg.norm(x_hat[0:2,i]-ref_traj[0:2,i])),2)/2;
+    plt.plot(error)
+
+    fig3 = plt.figure()
+    fig3.suptitle("Reference x vs Actual x")
+    plt.plot(ref_traj[0,:], label = "Reference x")
+    plt.plot(y[0,:], label = "Actual x")
+
+    fig4 = plt.figure()
+    fig4.suptitle("Reference y vs Actual y")
+    plt.plot(ref_traj[1,:], label = "Reference y")
+    plt.plot(y[1,:], label = "Actual y")
+
+    plt.show()
 
 class lqr_controller:
     def __init__(self):
         print("Creating LQR Controller Node")
         print("............................")
         rospy.init_node('LQR_Controller')
+        self.listener = tf.TransformListener()
+
         self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2)
         self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
         self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
         self.scan_sub = rospy.Subscriber('/scan', LaserScan, callback=self.scan_callback)
+        self.trans_sub = rospy.Subscriber('/linear_trans', transform, callback=self.trans_callback)
         self.odom_msg = Odometry()
         self.pose_msg = Pose()
         self.vel_msg = Twist()
         self.imu_msg = Imu()
         self.scan_msg = LaserScan()
+        self.trans_msg = transform()
         self.odom_updated = False
         self.imu_updated = False
         self.scan_updated = False
+        self.trans_updated = False
 
     def odom_callback(self, msg):
         self.odom_msg = msg
@@ -305,8 +337,11 @@ class lqr_controller:
     def scan_callback(self, msg):
         self.scan_msg = msg
         self.scan_updated = True
+    def trans_callback(self, msg):
+        self.trans_msg = msg
+        self.trans_updated = True
 
-    def lqr_loop(self, msg, i):
+    def lqr_loop(self, msg, i, trans_msg):
         global A, B, Xi, omega,n,x_hat,dt
         # try using ros timer to control the time Step , x and y vs time, mean square error for trajectory
         if i == 0:
@@ -315,63 +350,89 @@ class lqr_controller:
             tbot_y = msg.pose.pose.position.y
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
-            ###### LIDAR STUFF HERE #####
-            # y_lidar = sqrt(ldata(:,1).^2+ldata(:,2).^2);
-            # y_dist(1,1) = min(y_lidar);
-            # y_diff = y_dist(1,1);
-            # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            #
-            # % with redundant y coordinate measurement
-            # y(:,1) = [tbot_x; tbot_y; y_dist(1,1) - y_diff; 0; 0];
-            # y_alpha(:,1) = y(pMinusS,1);
+
+            y_lidar = trans_msg.linear_transform#from transform listener
+            print("Y LIDAR IS:" + str(y_lidar))
+            y[:,0] = [tbot_x, tbot_y, y_lidar, 0, 0] ####Y LIDAR IS LIDAR
+            y_alpha[:,0] = [y[0,0],y[1,0],y[3,0],y[4,0]]
             u[:,0] = -0.5*(np.matmul(np.matmul(np.matmul(R_inv,B.T),P[:,:,0]),x_hat[:,0])) - 0.5*(np.matmul(np.matmul(R_inv,B.T),s[:,0]))
             u_ast[:,0] = u[:,0]
             Xi[0,0] = dt*(u_ast[0,0]*np.cos(angles[2]) + u_ast[1,0]*np.sin(angles[2]))
             omega[0,0] = (u_ast[1,0]*np.cos(angles[2]) - u_ast[0,0]*np.sin(angles[2]))/Xi[0,0]
-            self.vel_msg.linear.x = Xi
-            self.vel_msg.angular.z = omega
+            self.vel_msg.linear.x = Xi[0,0]
+            self.vel_msg.angular.z = omega[0,0]
             self.vel_pub.publish(self.vel_msg)
             elapsed = time.time() - stime1
             while elapsed < dt:
                 elapsed = time.time() - stime1
-            else:
-                stime1 = time.time()
-                print("Step number " + str(i))
-                dxhat_dt = np.reshape(np.matmul(A,x_hat[:,i-1]),(2,1)) + np.matmul(B,u_ast[:,i-1]) + np.matmul(Theta[:,:,i-1],(y[:,i-1] - np.reshape(np.matmul(C,x_hat[:,i-1]),(2,1))))                x_temp = np.matmul(x_hat[:,i-1],A).reshape(-1, 1) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
-                x_hat[:,i] = np.reshape(np.reshape(x_hat[:,i-1],(2,1)) + dt * dxhat_dt,2)
+        else:
+            stime1 = time.time()
+            print("Step number " + str(i))
+            tbot_x = msg.pose.pose.position.x
+            tbot_y = msg.pose.pose.position.y
+            quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
+            angles = euler_from_quaternion(quat)
+            print("angles: " + str(angles))
 
-                dxhat_alpha_dt = np.reshape(np.matmul(A,x_alpha_hat[:,i-1]),(2,1)) + np.matmul(B, u_ast[:,i-1]) + np.matmul(Theta_alpha[:,:,i-1], (y_alpha[:,i-1] - np.matmul(C_alpha, x_alpha_hat[:,i-1])))
-                x_alpha_hat[:,i] = np.reshape(np.reshape(x_alpha_hat[:,i-1],(2,1)) + dt*dxhat_alpha_dt,2)
-                u[:,0] = -0.5*(np.matmul(np.matmul(np.matmul(R_inv,B.T),P[:,:,i]),x_alpha_hat[:,i])) - 0.5*(np.matmul(np.matmul(R_inv,B.T),s[:,i]))
-                z = cvx.Variable(2)
-                obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(np.matmul(x_hat[:,i].T, P[:,:,i]),B.T)*z + np.matmul(s[:,i].T,B)*z)
-                prob = cvx.Problem(obj,[0.5*cvx.quad_form(z,np.eye(2))+(-2*u[:,i].T*z) + (np.matmul(u[:,i].T,u[:,i])) - math.pow(gamma,2) <= 0])
-                prob.solve()
-                u_ast[:,i] = np.reshape(2*z.value,(2,1))
-                print(u_ast)
-                Xi[0,i] = dt*(u_ast[0,i]*np.cos(angles[2]) + u_ast[1,i]*np.sin(angles[2]))
+            y_lidar = trans_msg.linear_transform
+            print("Y LIDAR IS:" + str(y_lidar))
+            a = 0.01*np.random.randn()
+            y[0,i] = tbot_x
+            y[1,i] = tbot_y
+            y[2,i] = y_lidar
+            y[3,i] = (tbot_x - y[0,i-1])/dt
+            y[4,i] = (tbot_y - y[1,i-1])/dt
+            y_alpha[:,i] = [y[0,i],y[1,i],y[3,i],y[4,i]]
+
+            dxhat_dt = np.reshape(np.matmul(A,x_hat[:,i-1]),(4,1)) + np.reshape(np.matmul(B,u_ast[:,i-1]),(4,1)) + np.matmul(Theta[:,:,i-1],np.reshape(y[:,i-1],(5,1)) - np.reshape(np.matmul(C,x_hat[:,i-1]),(5,1)))
+            x_hat[:,i] = np.reshape(np.reshape(x_hat[:,i-1],(4,1)) + dt * dxhat_dt, 4)
+            print("IS X_HAT EXPLODING?: " + str(x_hat[:,i]))
+            dxhat_alpha_dt = np.reshape(np.matmul(A,x_alpha_hat[:,i-1]),(4,1)) + np.reshape(np.matmul(B, u_ast[:,i-1]),(4,1)) + np.matmul(Theta_alpha[:,:,i-1], (np.reshape(y_alpha[:,i-1],(4,1)) - np.reshape(np.matmul(C_alpha, x_alpha_hat[:,i-1]),(4,1))))
+            x_alpha_hat[:,i] = np.reshape(np.reshape(x_alpha_hat[:,i-1],(4,1)) + dt*dxhat_alpha_dt,4)
+            print("IS X_ALPHA_HAT EXPLODING?: " + str(x_alpha_hat[:,i]))
+            u[:,i] = -0.5*(np.matmul(np.matmul(np.matmul(R_inv,B.T),P[:,:,i]),x_alpha_hat[:,i])) - 0.5*(np.matmul(np.matmul(R_inv,B.T),s[:,i]))
+            print("IS U EXPLODING?: " + str(u[:,i]))
+            z = cvx.Variable(2)
+            obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(B.T,np.reshape(np.matmul(x_hat[:,i], P[:,:,i]) + s[:,i],(4,1))).T*z)
+            prob = cvx.Problem(obj,[0.5*cvx.quad_form(z,np.eye(2))+(-2*u[:,i].T*z) + (np.matmul(u[:,i].T,u[:,i])) - math.pow(gamma,2) <= 0])
+            prob.solve(solver = 'SCS')
+            print("RESULTS: " + str(z.value))
+            u_ast[:,i] = np.reshape(2*z.value,2)
+            print("Control input: " + str(u_ast[:,i]))
+            Xi[0,i] = dt*(u_ast[0,i]*np.cos(angles[2]) + u_ast[1,i]*np.sin(angles[2]))
+            if Xi[0,i] != 0:
                 omega[0,i] = (u_ast[1,i]*np.cos(angles[2]) - u_ast[0,i]*np.sin(angles[2]))/Xi[0,i]
-                print("Xi is: " + str(Xi))
-                print("omega is: " + str(omega))
-                self.vel_msg.linear.x = Xi
-                self.vel_msg.angular.z = omega
-                self.vel_pub.publish(self.vel_msg)
+                if omega[0,i] > 0.3:
+                    omega[0,i] = 0.3
+                if omega[0,i] < -0.3:
+                    omega[0,i] = -0.3
+            else:
+                omega[0,i] = 0
+            print("Xi is: " + str(Xi[0,i]))
+            print("omega is: " + str(omega[0,i]))
+            self.vel_msg.linear.x = Xi[0,i]
+            self.vel_msg.angular.z = omega[0,i]
+            self.vel_pub.publish(self.vel_msg)
+            elapsed = time.time() - stime1
+            while elapsed < dt:
                 elapsed = time.time() - stime1
-                while elapsed < dt:
-                    elapsed = time.time() - stime1
-                print("Elapsed time:" + str(elapsed))
-                print("----------------------")
+            print("Elapsed time:" + str(elapsed))
+            print("----------------------")
 
-                tbot_x = msg.pose.pose.position.x
-                tbot_y = msg.pose.pose.position.y
-                quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
-                angles = euler_from_quaternion(quat)
-                ###### LIDAR STUFF HERE #####
-                # scan = receive(laser);
-                # ldata = readCartesian(scan);
-                # y_lidar = sqrt(ldata(:,1).^2+ldata(:,2).^2);
-                # y_dist(1,i) = min(y_lidar);
-                a = 0.01*np.random.randn()
-                y[0,i] = tbot_x
-                y[1,i] = tbot_y
-                y[2,i] =
+
+if __name__ == "__main__":
+    if os.name != 'nt':
+        settings = termios.tcgetattr(sys.stdin)
+    try:
+        start_time = time.time()
+        Robot = lqr_controller()
+        for i in range(0, num_steps):
+            Robot.lqr_loop(Robot.odom_msg,i,Robot.trans_msg)
+        Robot.vel_msg.linear.x = 0
+        Robot.vel_msg.angular.z = 0
+        Robot.vel_pub.publish(Robot.vel_msg)
+        elapsed_time = time.time() - start_time
+        # plotting()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass

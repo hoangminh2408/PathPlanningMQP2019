@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import time
 import sys, select, os
 import random
-import matlab.engine
 if os.name == 'nt':
   import msvcrt
 else:
@@ -20,8 +19,6 @@ from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu, LaserScan
 from tf.transformations import euler_from_quaternion
-
-eng = matlab.engine.start_matlab() #Matlab script has to be in same directory as python script?
 
 print("Initializing Controller Variables")
 print("................................")
@@ -322,11 +319,10 @@ class lqr_controller:
             # tbot_y = tbot_y + randnumber
             # print("Random number: " + str(randnumber))
             # FDI VERSION 2: (possibly) big injection every 500 steps
-            #
             if i % 20 == 0:
-                randnumber1 = random.uniform(-1.5,1.5)
-                randnumber2 = random.uniform(-1.5,1.5)
-                tbot_x = tbot_x + randnumber1
+                randnumber1 = random.uniform(-2,2)
+                randnumber2 = random.uniform(-2,2)
+                tbot_x = tbot_x
                 tbot_y = tbot_y + randnumber2
                 print("Random number: " + str(randnumber1) + str(randnumber2))
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)

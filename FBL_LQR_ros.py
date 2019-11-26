@@ -8,6 +8,7 @@ from tf.transformations import euler_from_quaternion
 import copy
 import time
 import matplotlib.pyplot as plt
+import time
 import sys, select, os
 if os.name == 'nt':
   import msvcrt
@@ -291,9 +292,9 @@ class lqr_controller:
             stime1 = time.time()
             Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
             omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
-            self.vel_msg.linear.x = Xi
-            self.vel_msg.angular.z = omega
-            self.vel_pub.publish(self.vel_msg)
+            # self.vel_msg.linear.x = Xi
+            # self.vel_msg.angular.z = omega
+            # self.vel_pub.publish(self.vel_msg)
             elapsed = time.time() - stime1
             while elapsed < dt:
                 elapsed = time.time() - stime1
@@ -329,11 +330,13 @@ class lqr_controller:
                 omega = dt*(u[1,i]*np.cos(x_hat[2,i])-u[0,i]*np.sin(x_hat[2,i]))/Xi
             else:
                 omega = 0
-            print("Xi is: " + str(Xi))
-            print("omega is: " + str(omega))
-            self.vel_msg.linear.x = Xi
-            self.vel_msg.angular.z = omega
-            self.vel_pub.publish(self.vel_msg)
+            # print("Xi is: " + str(Xi))
+            # print("omega is: " + str(omega))
+            print("IMU X: " + str(tbot_x))
+            print("IMU Y: " + str(tbot_y))
+            #self.vel_msg.linear.x = Xi
+            #self.vel_msg.angular.z = omega
+            #self.vel_pub.publish(self.vel_msg)
             elapsed = time.time() - stime1
             while elapsed < dt:
                 elapsed = time.time() - stime1

@@ -165,7 +165,8 @@ for i = 2:num_steps
     y(2,i) = tbot_y;
 
     % with redundant y coordinate measurement
-    y(3,i) = y_dist(1,i) - y_diff + a;
+%     y(3,i) = y_dist(1,i) - y_diff + a;
+    y(3,i) = y_dist(1,i) - y_diff;
 %     y(3,i) = tbot_y;
     y(4,i) = (tbot_x - y(1,i-1))/dt;
     y(5,i) = (tbot_y - y(2,i-1))/dt;
