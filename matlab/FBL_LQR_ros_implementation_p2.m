@@ -100,18 +100,21 @@ omega(1,1) = (u_ast(2,1)*cos(angles(1))-u_ast(1,1)*sin(angles(1)))/Xi(1,1);
 msg.Angular.Z = 0.1*omega(1,1);
 msg.Linear.X = Xi(1,1);
 send(robot,msg);
-
+dx_hatdtarr = zeros(4,num_steps);
+dxhat_alpha_dtarr = zeros(4,num_steps);
+anglesarr = zeros(1,num_steps)
 for i = 2:num_steps
     tic;
 
     %% predicting states for linearized system
     dx_hatdt = A*x_hat(:,i-1) + B*u_ast(:,i-1) + Theta(:,:,i-1)*(y(:,i-1) - C*x_hat(:,i-1));
     x_hat(:,i) = x_hat(:,i-1) + dt*dx_hatdt;
-
+    
     dxhat_alpha_dt = A*x_alpha_hat(:,i-1) + B*u_ast(:,i-1) + Theta_alpha(:,:,i-1)*(y_alpha(:,i-1) - C_alpha*x_alpha_hat(:,i-1));
     x_alpha_hat(:,i) = x_alpha_hat(:,i-1) + dt*dxhat_alpha_dt;
 
-
+    dx_hatdtarr(:,i) = dx_hatdt;
+    dxhat_alpha_dtarr(:,i) = dxhat_alpha_dt;
     u (:,i) = -0.5*R_inv*B'*P(:,:,i)*x_alpha_hat(:,i) - 0.5*R_inv*B'*s(:,i);
 
     opt_start = tic;
@@ -151,7 +154,7 @@ for i = 2:num_steps
     tbot_y = state.Pose.Pose.Position.Y;
     quat = state.Pose.Pose.Orientation;
     angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
-
+    anglesarr(:,i) = angles(1);
     scan = receive(laser);
     ldata = readCartesian(scan);
     y_lidar = sqrt(ldata(:,1).^2+ldata(:,2).^2);
