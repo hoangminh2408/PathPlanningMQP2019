@@ -23,8 +23,8 @@ import cvxpy as cvx
 print("Initializing Controller Variables")
 print("................................")
 # eng = matlab.engine.start_matlab()
-T = 100;
-num_steps = 5000;
+T = 150;
+num_steps = 7500;
 tgetkey = 0;
 
 rd_tar = 1;
@@ -246,7 +246,7 @@ Phi = np.zeros((n,n,num_steps))
 Phi_alpha = np.zeros((n,n,num_steps))
 Theta = np.zeros((n,p,num_steps))
 Theta_alpha = np.zeros((n,secureSensors,num_steps))
-gamma = 15 #CHANGE GAMMA, GAMMA CAN ONLY BE <15
+gamma = 15 #CHANGE GAMMA
 
 for i in range(1, num_steps):
     dPhi_alpha_dt = np.matmul(A, Phi_alpha[:,:,i-1]) + np.matmul(Phi_alpha[:,:,i-1], A.T) + Sigma_w - np.matmul(np.matmul(np.matmul(np.matmul(Phi_alpha[:,:,i-1],C_alpha.T),Sigma_v_alpha_inv),C_alpha),Phi_alpha[:,:,i-1].T)
@@ -266,6 +266,7 @@ Xi = np.zeros((1,num_steps))
 omega = np.zeros((1,num_steps))
 angles = 0
 # DONE SETTING UP Variables
+# EVERYTHING ABOVE ARE RIGHT
 def plotting():
     global ref_traj, y, dt, T, num_steps, elapsed_time
     plt.ioff()
@@ -337,6 +338,7 @@ class lqr_controller:
 
     def lqr_loop(self, msg, i, trans_msg):
         global A, B, Xi, omega,n,x_hat,dt,angles
+        # try using ros timer to control the time Step , x and y vs time, mean square error for trajectory
         if i == 0:
             stime1 = time.time()
             tbot_x = msg.pose.pose.position.x
@@ -347,8 +349,8 @@ class lqr_controller:
             print(tbot_y)
 
             y_lidar = trans_msg.linear_transform#from transform listener
-            print("Y LIDAR IS:" + str(y_lidar))
-            y[:,0] = [tbot_x, tbot_y, y_lidar, 0, 0]
+            print("Y LIDAR IS:" + str(y_lidar*8))
+            y[:,0] = [tbot_x, tbot_y, y_lidar*8, 0, 0]
             y_alpha[:,0] = [y[0,0],y[1,0],y[3,0],y[4,0]]
             u[:,0] = -0.5*(np.matmul(np.matmul(np.matmul(R_inv,B.T),P[:,:,0]),x_hat[:,0])) - 0.5*(np.matmul(np.matmul(R_inv,B.T),s[:,0]))
             u_ast[:,0] = u[:,0]
@@ -378,15 +380,21 @@ class lqr_controller:
             u[:,i] = -0.5*(np.matmul(np.matmul(np.matmul(R_inv,B.T),P[:,:,i]),x_alpha_hat[:,i])) - 0.5*(np.matmul(np.matmul(R_inv,B.T),s[:,i]))
             print("U: " + str(u[:,i]))
             z = cvx.Variable(2)
+            # print(np.matmul(np.matmul(x_hat[:,i].T, P[:,:,i]),B)*z + np.matmul(s[:,i].T,B)*z)
+            # print(np.matmul(B.T,np.reshape(np.matmul(x_hat[:,i], P[:,:,i]) + s[:,i],(4,1))).T*z)
+            # exit()
+            # obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(np.matmul(x_hat[:,i].T, P[:,:,i]),B)*z + np.matmul(s[:,i].T,B)*z)
             obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(B.T,np.reshape(np.matmul(x_hat[:,i], P[:,:,i]) + s[:,i],(4,1))).T*z)
             prob = cvx.Problem(obj,[0.5*cvx.quad_form(z,np.eye(2))+(-2*u[:,i].T*z) + (np.matmul(u[:,i].T,u[:,i])) - math.pow(gamma,2) <= 0])
             prob.solve(solver = 'SCS')
             print("RESULTS: " + str(z.value))
             u_ast[:,i] = np.reshape(2*z.value,2)
             print("Control input: " + str(u_ast[:,i]))
-            Xi[0,i] = 0.9*T*dt*(u_ast[0,i]*np.cos(angles[2]) + u_ast[1,i]*np.sin(angles[2]))
+            Xi[0,i] = (9000/T)*dt*(u_ast[0,i]*np.cos(angles[2]) + u_ast[1,i]*np.sin(angles[2]))
+            # Xi[0,i] = u[0,i]*np.cos(x_hat[2,i])*dt+u[1,i]*np.sin(x_hat[2,i])*dt
             if Xi[0,i] != 0:
-                omega[0,i] = 0.9*T*dt*(u_ast[1,i]*np.cos(angles[2]) - u_ast[0,i]*np.sin(angles[2]))/Xi[0,i]
+                omega[0,i] = (9000/T)*dt*(u_ast[1,i]*np.cos(angles[2]) - u_ast[0,i]*np.sin(angles[2]))/Xi[0,i]
+                # omega[0,i] = dt*(u[1,i]*np.cos(x_hat[2,i])-u[0,i]*np.sin(x_hat[2,i]))/Xi[0,i]
             else:
                 omega[0,i] = 0
             print("Xi is: " + str(Xi[0,i]))
@@ -406,13 +414,13 @@ class lqr_controller:
             print("angles: " + str(angles))
 
             y_lidar = trans_msg.linear_transform
-            print("Y LIDAR IS:" + str(y_lidar))
+            print("Y LIDAR IS:" + str(y_lidar*8))
             print("ACTUAL Y IS: " + str(tbot_y))
             print("----------------------")
             a = 0.01*np.random.randn()
             y[0,i] = tbot_x
             y[1,i] = tbot_y
-            y[2,i] = y_lidar+a
+            y[2,i] = y_lidar*8+a
             y[3,i] = (tbot_x - y[0,i-1])/dt
             y[4,i] = (tbot_y - y[1,i-1])/dt
             y_alpha[:,i] = [y[0,i],y[1,i],y[3,i],y[4,i]]
