@@ -8,29 +8,11 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-What things you need to install the software and how to install them
-
-```
-Give examples
-```
+This project runs code on a remote computer using Ubuntu Linux 16.04 with ROS Kinetic Installed. This remote computer communicates to a Turtlebot3 Burger robot via Wi-Fi connection. 
 
 ### Installing
 
-A step by step series of examples that tell you how to get a development env running
-
-Say what the step will be
-
-```
-Give the example
-```
-
-And repeat
-
-```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
+First, in order to run the simulation, ROS Kinetic must be installed. Installation instructions for ROS Kinetic can be found on the [ROS Documentation Website](http://wiki.ros.org/kinetic/Installation)
 
 ## Running the tests
 
@@ -58,6 +40,7 @@ Add additional notes about how to deploy this on a live system
 
 ## Built With
 
+* [Turtlebot3](http://emanual.robotis.com/docs/en/platform/turtlebot3/overview/) - An open-source autonomous robot platform
 * [Robot Operating System (ROS)](http://wiki.ros.org/) - Robot Middleware Package used on Turtlebot3
 * [NumPy](https://numpy.org/) - Mathematical Library for Python in order to complete calculations using matricies
 * [CVXPy](https://www.cvxpy.org/) - Convex Optimization solver library for Python 
