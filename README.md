@@ -4,7 +4,7 @@ The Autonomous Path Planning Under Cyberattacks Major Qualifying Project (MQP), 
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+These instructions will get you a copy of the project running on a local machine, in which the robot attempts to drive a "figure eight" trajectory while there is a simulated attack on the robot's LIDAR sensor, injecting it with false position data. The software uses a mitigation method in order to reduce the effect of the simulated attack, and allows for the robot to travel the pre-planned trajectory with little disruption to desired operation. 
 
 ### Prerequisites
 
@@ -12,7 +12,14 @@ This project runs code on a remote computer using Ubuntu Linux 16.04 with ROS Ki
 
 ### Installing
 
-First, in order to run the simulation, ROS Kinetic must be installed. Installation instructions for ROS Kinetic can be found on the [ROS Documentation Website](http://wiki.ros.org/kinetic/Installation)
+First, in order to run the simulation, ROS Kinetic must be installed. Installation instructions for ROS Kinetic can be found on the [ROS Documentation Website](http://wiki.ros.org/kinetic/Installation). Once ROS is installed, create a [Catkin Workspace](http://wiki.ros.org/catkin/Tutorials/create_a_workspace) in which the project package can be created. Once the workspace directory is created, the workspace must be created with catkin via
+```
+catkin_make
+```
+and the workspace must be sourced with
+```
+source devel/setup.bash
+```
 
 ## Running the tests
 
