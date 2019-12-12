@@ -20,22 +20,24 @@ from tf.transformations import euler_from_quaternion
 from pathplanningmqp.msg import transform
 import cvxpy as cvx
 
+#Initialize Controller Variables
 print("Initializing Controller Variables")
 print("................................")
-# eng = matlab.engine.start_matlab()
+
+#Change T and num_steps to modify runtime and dt (dt = T/num_steps)
 T = 150;
 num_steps = 7500;
-tgetkey = 0;
+tgetkey = 0; #for getkey() function used for debugging, recommend not to use because this will increase dt significantly
 
 rd_tar = 1;
 rd_obs = 1;
 target = np.array([2, 0.001, 0]);
 obs = np.array([-1, 1]);
 
+#Reference trajectory
 t = np.linspace(1, 100.0, num = num_steps);
 x1 = 0.8*np.sin(t/10);
 x2 = 0.8*np.sin(t/20);
-
 parametric_func = np.zeros((2,num_steps))
 parametric_func[0] = x1
 parametric_func[1] = x2
@@ -125,11 +127,7 @@ start_point = np.concatenate((start_point, ref_traj_dot[0:2, 0]));
 target = ref_traj[:,ref_length-1]
 ref_traj = np.concatenate((ref_traj[0:2,:], ref_traj_dot[0:2,:]))
 s_coeff = np.zeros((n,degree + 1))
-# for i in range(0,n):
-#     s_coeff[i,:] = np.polyfit(t, ref_traj[i,:], degree)
-# for i in range(0,n):
-#     # ref_traj[i,:] = np.polyval(s_coeff[i,:], t)
-#     break
+
 diffrc = ref_traj[:,0]
 diffrc = np.reshape(diffrc,(4,1))
 ref_traj[:,:] = ref_traj[:,:] - diffrc;
@@ -215,6 +213,8 @@ while np.all(abs(P - P_prev)) >= 0.001:
     P_prev = P
     P = P + (2*Q + np.matmul(A.T, P) + np.matmul(P, A) - 0.5*np.matmul(np.matmul(np.matmul(np.matmul(P,B),R_inv),B.T),P)) * dt
 BG = np.hstack((B,G))
+
+#Kalman filter coefficients
 K = np.array([[1.28718850581117,	-6.38557171480376e-16,	-2.40028202841119e-17,	0.414213562373096,	1.58212337667351e-16],
               [7.26223872225245e-17,	1.28602530882083,	0.00214337551470138,	-1.42961771886354e-15,	0.414011544555625],
               [0.414213562373095, 2.63342314537682e-16,	-5.03336638922339e-18,	0.910179721124455,	1.37263357977565e-16],
@@ -246,7 +246,9 @@ Phi = np.zeros((n,n,num_steps))
 Phi_alpha = np.zeros((n,n,num_steps))
 Theta = np.zeros((n,p,num_steps))
 Theta_alpha = np.zeros((n,secureSensors,num_steps))
-gamma = 15 #CHANGE GAMMA
+
+#Gamma should not exceed 15
+gamma = 15
 
 for i in range(1, num_steps):
     dPhi_alpha_dt = np.matmul(A, Phi_alpha[:,:,i-1]) + np.matmul(Phi_alpha[:,:,i-1], A.T) + Sigma_w - np.matmul(np.matmul(np.matmul(np.matmul(Phi_alpha[:,:,i-1],C_alpha.T),Sigma_v_alpha_inv),C_alpha),Phi_alpha[:,:,i-1].T)
@@ -265,16 +267,18 @@ B_ind = 0;
 Xi = np.zeros((1,num_steps))
 omega = np.zeros((1,num_steps))
 angles = 0
-# DONE SETTING UP Variables
-# EVERYTHING ABOVE ARE RIGHT
+
 def plotting():
     global ref_traj, y, dt, T, num_steps, elapsed_time
     plt.ioff()
+
+    #Reference trajectory vs Actual trajectory
     fig1 = plt.figure()
     fig1.suptitle("Reference trajectory vs Actual trajectory\n " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
     plt.plot(y[0,:], y[1,:], label = 'Actual trajectory')
 
+    #Mean Square Error
     fig2 = plt.figure()
     fig2.suptitle("Mean Square Error\n" + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     error = np.zeros(num_steps)
@@ -282,16 +286,19 @@ def plotting():
         error[i] = math.pow((np.linalg.norm(x_hat[0:2,i]-ref_traj[0:2,i])),2)/2;
     plt.plot(error)
 
+    #Reference x vs Actual x
     fig3 = plt.figure()
     fig3.suptitle("Reference x vs Actual x")
     plt.plot(ref_traj[0,:], label = "Reference x")
     plt.plot(y[0,:], label = "Actual x")
 
+    #Reference y vs Actual y
     fig4 = plt.figure()
     fig4.suptitle("Reference y vs Actual y")
     plt.plot(ref_traj[1,:], label = "Reference y")
     plt.plot(y[1,:], label = "Actual y")
 
+    #Reference y vs Lidar's y
     fig5 = plt.figure()
     fig5.suptitle("Reference y vs Lidar's y")
     plt.plot(ref_traj[1,:], label = "Reference y")
@@ -338,7 +345,6 @@ class lqr_controller:
 
     def lqr_loop(self, msg, i, trans_msg):
         global A, B, Xi, omega,n,x_hat,dt,angles
-        # try using ros timer to control the time Step , x and y vs time, mean square error for trajectory
         if i == 0:
             stime1 = time.time()
             tbot_x = msg.pose.pose.position.x
@@ -348,7 +354,7 @@ class lqr_controller:
             print(tbot_x)
             print(tbot_y)
 
-            y_lidar = trans_msg.linear_transform#from transform listener
+            y_lidar = trans_msg.linear_transform #from transform listener
             print("Y LIDAR IS:" + str(y_lidar*8))
             y[:,0] = [tbot_x, tbot_y, y_lidar*8, 0, 0]
             y_alpha[:,0] = [y[0,0],y[1,0],y[3,0],y[4,0]]
@@ -369,6 +375,7 @@ class lqr_controller:
             stime1 = time.time()
             print("Step number " + str(i))
 
+            #Predicting states
             dxhat_dt = np.reshape(np.matmul(A,x_hat[:,i-1]),(4,1)) + np.reshape(np.matmul(B,u_ast[:,i-1]),(4,1)) + np.matmul(Theta[:,:,i-1],np.reshape(y[:,i-1],(5,1)) - np.reshape(np.matmul(C,x_hat[:,i-1]),(5,1)))
             print("DXHAT_DT: " + str(dxhat_dt))
             x_hat[:,i] = np.reshape(np.reshape(x_hat[:,i-1],(4,1)) + dt * dxhat_dt, 4)
@@ -379,22 +386,18 @@ class lqr_controller:
             print("X_ALPHA_HAT: " + str(x_alpha_hat[:,i]))
             u[:,i] = -0.5*(np.matmul(np.matmul(np.matmul(R_inv,B.T),P[:,:,i]),x_alpha_hat[:,i])) - 0.5*(np.matmul(np.matmul(R_inv,B.T),s[:,i]))
             print("U: " + str(u[:,i]))
+
+            #QCQP Solver
             z = cvx.Variable(2)
-            # print(np.matmul(np.matmul(x_hat[:,i].T, P[:,:,i]),B)*z + np.matmul(s[:,i].T,B)*z)
-            # print(np.matmul(B.T,np.reshape(np.matmul(x_hat[:,i], P[:,:,i]) + s[:,i],(4,1))).T*z)
-            # exit()
-            # obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(np.matmul(x_hat[:,i].T, P[:,:,i]),B)*z + np.matmul(s[:,i].T,B)*z)
             obj = cvx.Minimize(cvx.quad_form(z,R) + np.matmul(B.T,np.reshape(np.matmul(x_hat[:,i], P[:,:,i]) + s[:,i],(4,1))).T*z)
             prob = cvx.Problem(obj,[0.5*cvx.quad_form(z,np.eye(2))+(-2*u[:,i].T*z) + (np.matmul(u[:,i].T,u[:,i])) - math.pow(gamma,2) <= 0])
             prob.solve(solver = 'SCS')
-            print("RESULTS: " + str(z.value))
-            u_ast[:,i] = np.reshape(2*z.value,2)
+            u_ast[:,i] = np.reshape(2*z.value,2) #Control input u alpha
+
             print("Control input: " + str(u_ast[:,i]))
             Xi[0,i] = (9000/T)*dt*(u_ast[0,i]*np.cos(angles[2]) + u_ast[1,i]*np.sin(angles[2]))
-            # Xi[0,i] = u[0,i]*np.cos(x_hat[2,i])*dt+u[1,i]*np.sin(x_hat[2,i])*dt
             if Xi[0,i] != 0:
                 omega[0,i] = (9000/T)*dt*(u_ast[1,i]*np.cos(angles[2]) - u_ast[0,i]*np.sin(angles[2]))/Xi[0,i]
-                # omega[0,i] = dt*(u[1,i]*np.cos(x_hat[2,i])-u[0,i]*np.sin(x_hat[2,i]))/Xi[0,i]
             else:
                 omega[0,i] = 0
             print("Xi is: " + str(Xi[0,i]))
@@ -407,12 +410,14 @@ class lqr_controller:
                 elapsed = time.time() - stime1
             print("Elapsed time:" + str(elapsed))
 
+            #Get positions from Turtlebot
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
             print("angles: " + str(angles))
 
+            #Get Y from lidar
             y_lidar = trans_msg.linear_transform
             print("Y LIDAR IS:" + str(y_lidar*8))
             print("ACTUAL Y IS: " + str(tbot_y))
@@ -443,4 +448,3 @@ if __name__ == "__main__":
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
-

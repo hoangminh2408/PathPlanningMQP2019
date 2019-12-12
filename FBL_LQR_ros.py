@@ -19,15 +19,19 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu, LaserScan
 from tf.transformations import euler_from_quaternion
 
+#Initialize Controller Variables
 print("Initializing Controller Variables")
 print("................................")
-T = 50;
-num_steps = 50000;
-tgetkey = 0;
+
+#Change T and num_steps to modify runtime and dt (dt = T/num_steps)
+T = 150;
+num_steps = 15000;
+tgetkey = 0; #for getkey() function used for debugging, recommend not to use because this will increase dt significantly
 
 n = 3;
 m = 2;
 p = 3;
+
 pMinusS = np.array([2]);
 A = np.identity(3);
 B = np.array([[1, 0],
@@ -50,6 +54,8 @@ rd_tar = 1;
 rd_obs = 1;
 target = np.array([2, 0.001, 0]);
 obs = np.array([-1, 1]);
+
+#Reference trajectory
 t = np.linspace(0.0, 100.0, num = num_steps);
 x1 = 0.8*np.sin(t/10);
 x2 = 0.8*np.sin(t/20);
@@ -174,6 +180,7 @@ error = np.zeros((1,num_steps));
 cost = np.zeros((1,num_steps));
 finish = False;
 
+#Calculate s matrix
 for j in range(num_steps-2, -1, -1):
     k = -(np.linalg.inv(B_l.conj().transpose()*b[:,:,j+1]*B_l+R)*B_l.conj().transpose()*b[:,:,j+1])*A_l;
     b[:,:,j] = A_l.conj().transpose()*(b[:,:,j+1]-b[:,:,j+1]*B_l*np.linalg.inv(B_l.conj().transpose()*b[:,:,j+1]*B_l+R)*B_l.conj().transpose()*b[:,:,j+1])*A_l+Q_l;
@@ -201,6 +208,7 @@ Phi = np.zeros((n,n,num_steps));
 Theta = np.zeros((n,p,num_steps));
 Theta[:,:,0] = Phi[:,:,0]*C.conj().transpose()*Sigma_v_inv;
 
+#Calculate initial control input u
 uu1 = np.linalg.inv(np.matmul(np.matmul(B_lh,b[:,:,0]),B_l)+R)
 uu2 = np.matmul(uu1,B_lh)
 uu3 = (np.matmul(np.matmul(b[:,:,0],A_l),x_hat[0:2,0])+s[:,0])
@@ -208,19 +216,23 @@ uu3 = np.reshape(uu3,(2,1))
 uu4 = np.matmul(uu2,uu3)/dt
 uu4 = np.reshape(uu4,(2,1))
 uu5 = np.reshape(ref_traj_db_dot[0:2,0]*dt,(2,1)) - uu4
-
 u[:,0] = np.reshape(uu5,(1,2))
 
 start_time = 0
 elapsed_time = 0
+
+#Plot graphs
 def plotting():
     global ref_traj, y, dt, T, num_steps, elapsed_time
     plt.ioff()
+
+    #Reference trajectory vs Actual trajectory
     fig1 = plt.figure()
     fig1.suptitle("Reference trajectory vs Actual trajectory\n " + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     plt.plot(ref_traj[0,:], ref_traj[1,:], label = 'Reference trajectory')
     plt.plot(y[0,:], y[1,:], label = 'Actual trajectory')
 
+    #Mean Square Error
     fig2 = plt.figure()
     fig2.suptitle("Mean Square Error\n" + "dt = " + str(dt) + "; T = " + str(T) + "; num_steps = " + str(num_steps) + "; Elapsed time: " + str(elapsed_time))
     error = np.zeros(num_steps)
@@ -228,11 +240,13 @@ def plotting():
         error[i] = math.pow((np.linalg.norm(x_hat[0:2,i]-ref_traj[0:2,i])),2)/2;
     plt.plot(error)
 
+    #Reference x vs Actual x
     fig3 = plt.figure()
     fig3.suptitle("Reference x vs Actual x")
     plt.plot(ref_traj[0,:], label = "Reference x")
     plt.plot(y[0,:], label = "Actual x")
 
+    #Reference y vs Actual y
     fig4 = plt.figure()
     fig4.suptitle("Reference y vs Actual y")
     plt.plot(ref_traj[1,:], label = "Reference y")
@@ -240,6 +254,7 @@ def plotting():
 
     plt.show()
 
+#Use this function to stop the robot with a key press, not recommended because this will increase dt significantly. Set tgetkey = 0 to disable
 def getKey():
     global tgetkey
     if os.name == 'nt':
@@ -255,6 +270,7 @@ def getKey():
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
+#LQR controller class, initialize node, publishers, and subscribers
 class lqr_controller:
     def __init__(self):
         print("Creating LQR Controller Node")
@@ -287,36 +303,43 @@ class lqr_controller:
 
     def lqr_loop(self, msg, i):
         global A, B, Xi, omega,n,x_hat,dt
-        # try using ros timer to control the time Step , x and y vs time, mean square error for trajectory
+        #Calculate initial Xi and omega
         if i == 0:
             stime1 = time.time()
             Xi = u[0,0]*np.cos(x_hat[2,0])*dt+u[1,0]*np.sin(x_hat[2,0])*dt
             omega = dt*(u[1,0]*np.cos(x_hat[2,0])-u[0,0]*np.sin(x_hat[2,0]))/Xi
-            # self.vel_msg.linear.x = Xi
-            # self.vel_msg.angular.z = omega
-            # self.vel_pub.publish(self.vel_msg)
+            self.vel_msg.linear.x = Xi
+            self.vel_msg.angular.z = omega
+            self.vel_pub.publish(self.vel_msg)
             elapsed = time.time() - stime1
+
+            #Loop until elapsed >= dt
             while elapsed < dt:
                 elapsed = time.time() - stime1
         else:
-            stime1 = time.time()
+            stime1 = time.time() #start stopwatch for one single step
             print("Step number " + str(i))
             x_temp = np.matmul(x_hat[:,i-1],A).reshape(-1, 1) + np.matmul(B,np.array([[1.5*Xi*dt],[omega*dt]]));
             A_ext = np.array([[1, 0, -dt*Xi*np.sin(x_hat[2,i-1])],
                      [0, 1, dt*Xi*np.cos(x_hat[2,i-1])],
                      [0, 0, 1]])
             Phi_temp = np.matmul(np.matmul(A_ext,Phi[:,:,i-1]),A_ext.conj().transpose())+Sigma_w;
+
+            #Get positions from Turtlebot
             tbot_x = msg.pose.pose.position.x
             tbot_y = msg.pose.pose.position.y
             quat = (msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
             angles = euler_from_quaternion(quat)
-            y[:,i] = [tbot_x, tbot_y, angles[2]]; #add random value to y
+            y[:,i] = [tbot_x, tbot_y, angles[2]];
+
             z = y[:,i].reshape(-1,1)-np.matmul(C,x_temp);
             s_temp = np.matmul(np.matmul(C,Phi_temp),C.conj().transpose())+Sigma_v;
             Theta[:,:,i] = np.matmul(np.matmul(Phi_temp,C.conj().transpose()),np.linalg.inv(s_temp));
             x_hat[:,i] = np.reshape(x_temp + np.matmul(Theta[:,:,i],z),3);
             Phi[:,:,i] = np.matmul((np.identity(n) - np.matmul(Theta[:,:,i],C)),Phi_temp)
             B = np.array([[np.cos(x_hat[2,i]),0],[np.sin(x_hat[2,i]),0],[0,1]])
+
+            #Calculate control input u
             uu1 = np.linalg.inv(np.matmul(np.matmul(B_lh,b[:,:,i]),B_l)+R)
             uu2 = np.matmul(uu1,B_lh)
             uu3 = (np.matmul(np.matmul(b[:,:,i],A_l),x_hat[0:2,i])+s[:,i])
@@ -325,23 +348,29 @@ class lqr_controller:
             uu4 = np.reshape(uu4,(2,1))
             uu5 = np.reshape(ref_traj_db_dot[0:2,i]*dt,(2,1)) - uu4
             u[:,i] = np.reshape(uu5,(1,2))
+
+            #Calculate Xi and omega
             Xi = u[0,i]*np.cos(x_hat[2,i])*dt+u[1,i]*np.sin(x_hat[2,i])*dt
             if Xi != 0:
                 omega = dt*(u[1,i]*np.cos(x_hat[2,i])-u[0,i]*np.sin(x_hat[2,i]))/Xi
             else:
                 omega = 0
-            # print("Xi is: " + str(Xi))
-            # print("omega is: " + str(omega))
+            print("Xi is: " + str(Xi))
+            print("omega is: " + str(omega))
             print("IMU X: " + str(tbot_x))
             print("IMU Y: " + str(tbot_y))
-            #self.vel_msg.linear.x = Xi
-            #self.vel_msg.angular.z = omega
-            #self.vel_pub.publish(self.vel_msg)
+
+            #Publish message to velocity topic
+            self.vel_msg.linear.x = Xi
+            self.vel_msg.angular.z = omega
+            self.vel_pub.publish(self.vel_msg)
             elapsed = time.time() - stime1
             while elapsed < dt:
                 elapsed = time.time() - stime1
             print("Elapsed time:" + str(elapsed))
             print("----------------------")
+
+#Main function
 if __name__ == "__main__":
     if os.name != 'nt':
         settings = termios.tcgetattr(sys.stdin)
