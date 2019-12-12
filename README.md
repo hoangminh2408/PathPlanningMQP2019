@@ -44,14 +44,25 @@ Once in the pathplanningmqp directory, run the test using:
 ```
 rosrun pathplanningmqp FBL_LQD_ros.py
 ```
+The robot must be placed in the middle of a room with moderate amount of free space to complete the trajectory. The robot will then attempt to travel the "figure eight" curve autonomously, with information about each iteration of the loop printed to the terminal. Once the robot has traveled the required amount, it will stop automatically. The program then displays graph outputs of the robot's trajectory over time compared to the actual pre-programmed trajectory, as well as other data to measure how closely the robot was able to follow the pre-programmed trajectory.
 
-### False Data Injection Test
-Explain what these tests test and why
+### False Data Injection (FDI) Test
+The FDI Test involves the LQG controller being run while a simulated attacker injects false information to the robot's Y position sensor. This requires the use of two seperate sets of sensors, the Turtlebot3's LIDAR and it's internal IMU, which both are able to report the robot's position. Within this simulation, the LIDAR's Y position is given a random offset each iteration of the control loop. The mitigation method then takes the IMU and LIDAR position values, and calculates a 
 
+The first two steps to run the FDI test are the same as running the LQG test, which includes running roscore and the bringup packages, then navigating to the pathplanningmqp directory within the catkin workspace.
+Next, the built-in ROS GMapping package must be run in a third terminal window. This allows for the generation of a map of the robot's environment by the LIDAR:
 ```
-Give an example
+roslaunch turtlebot3_slam turtlebot3_slam.launch slam_methods:=gmapping
 ```
-
+With the gmapping running, the transform listener must be run in a seperate window, which allows for the estimated position of the robot within the map to be output to the LQG Controller. This uses the ROS /tf library:
+```
+rosrun pathplanningmqp transform_listener.py
+```
+With the GMapping and transform listener running, the FDI test can then be run:
+```
+rosrun pathplanningmqp FBI_LQR_FDI_simulation.py
+```
+The robot will then attempt to travel the same trajectory as in the LQG Test, while mitigating the simulated attack on the robot's LIDAR sensor. 
 ## Additional Notes
 
 If the Turtlebot3 model is not set within ROS, an error may occur when trying to run either of the tests. In order to set the model, use:
