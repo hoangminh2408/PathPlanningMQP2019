@@ -69,7 +69,6 @@ If the Turtlebot3 model is not set within ROS, an error may occur when trying to
 ```
 export TURTLEBOT3_MODEL=burger
 ```
-Within the same terminal window in which the python file is trying to be ran
 If the python file cannot be executed, make sure that the python file is given proper executable user permissions:
 ```
 chmod +x FILE_NAME_HERE.py
