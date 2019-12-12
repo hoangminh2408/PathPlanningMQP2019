@@ -4,7 +4,7 @@ The Autonomous Path Planning Under Cyberattacks Major Qualifying Project (MQP), 
 
 ## Getting Started
 
-These instructions will get you a copy of the project running on a local machine, in which the robot attempts to drive a "figure eight" trajectory while there is a simulated attack on the robot's LIDAR sensor, injecting it with false position data. The software uses a mitigation method in order to reduce the effect of the simulated attack, and allows for the robot to travel the pre-planned trajectory with little disruption to desired operation. 
+These instructions will get you a copy of the project running on a local machine, in which the robot attempts to autonomously drive a "figure eight" trajectory while there is a simulated attack on the robot's LIDAR sensor, injecting it with false position data. The software uses a mitigation method in order to reduce the effect of the simulated attack, and allows for the robot to travel the pre-planned trajectory with little disruption to desired operation. 
 
 ### Prerequisites
 
@@ -20,30 +20,49 @@ and the workspace must be sourced with
 ```
 source devel/setup.bash
 ```
+The entire repository can then be placed as a folder within the workspace directory. 
 
-## Running the tests
+## Running the simulation
 
-Explain how to run the automated tests for this system
+The project consists of two tests, the LQG Controller which allows for the robot to travel the preplanned trajectory, and the LQG Controller with the migitation method under a simulated false data injection attack. 
 
-### Break down into end to end tests
+### LQG Controller Test
 
+In order to run the LQG Controller test, roscore must first be started in a terminal window on a remote computer:
+```
+roscore
+```
+Then, connect to the Turtlebot3 from the remote computer in a second terminal window and bringup the basic ROS packages on the turtlebot (must be run on the Turtlebot3 itself via SSH, not on the remote computer)
+```
+roslaunch turtlebot3_bringup turtlebot3_robot.launch
+```
+Once roscore is up and the bringup packages have been run on the robot, navigate to the pathplanning package folder within the catkin workspace using a third terminal window. An easy way to navigate to this folder within ros is:
+```
+roscd pathplanningmqp
+```
+Once in the pathplanningmqp directory, run the test using:
+```
+rosrun pathplanningmqp FBL_LQD_ros.py
+```
+
+### False Data Injection Test
 Explain what these tests test and why
 
 ```
 Give an example
 ```
 
-### And coding style tests
+## Additional Notes
 
-Explain what these tests test and why
-
+If the Turtlebot3 model is not set within ROS, an error may occur when trying to run either of the tests. In order to set the model, use:
 ```
-Give an example
+export TURTLEBOT3_MODEL=burger
 ```
-
-## Deployment
-
-Add additional notes about how to deploy this on a live system
+Within the same terminal window in which the python file is trying to be ran
+If the python file cannot be executed, make sure that the python file is given proper executable user permissions:
+```
+chmod +x FILE_NAME_HERE.py
+``` 
 
 ## Built With
 
