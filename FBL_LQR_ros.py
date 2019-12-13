@@ -16,7 +16,6 @@ else:
   import tty, termios
 from geometry_msgs.msg import PoseStamped, Twist, Pose, PoseWithCovariance
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Imu, LaserScan
 from tf.transformations import euler_from_quaternion
 
 #Initialize Controller Variables
@@ -26,7 +25,7 @@ print("................................")
 #Change T and num_steps to modify runtime and dt (dt = T/num_steps)
 T = 150;
 num_steps = 15000;
-tgetkey = 0; #for getkey() function used for debugging, recommend not to use because this will increase dt significantly
+tgetkey = 0; #for getkey() function used for debugging, recommend not to use during normal operation because this will increase dt significantly
 
 n = 3;
 m = 2;
@@ -55,7 +54,7 @@ rd_obs = 1;
 target = np.array([2, 0.001, 0]);
 obs = np.array([-1, 1]);
 
-#Reference trajectory
+#Reference trajectory of a "figure eight" shape
 t = np.linspace(0.0, 100.0, num = num_steps);
 x1 = 0.8*np.sin(t/10);
 x2 = 0.8*np.sin(t/20);
@@ -276,30 +275,16 @@ class lqr_controller:
         print("Creating LQR Controller Node")
         print("............................")
         rospy.init_node('LQR_Controller')
-        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2)
-        self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback)
-        self.imu_sub = rospy.Subscriber('/imu', Imu, callback=self.imu_callback)
-        self.scan_sub = rospy.Subscriber('/scan', LaserScan, callback=self.scan_callback)
+        self.vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size = 2) # Publish a twist message in order to control the robot's movement
+        self.odom_sub = rospy.Subscriber('/odom', Odometry, callback=self.odom_callback) # subscribe to the robot's IMU in order to recieve position data
         self.odom_msg = Odometry()
         self.pose_msg = Pose()
         self.vel_msg = Twist()
-        self.imu_msg = Imu()
-        self.scan_msg = LaserScan()
         self.odom_updated = False
-        self.imu_updated = False
-        self.scan_updated = False
 
-    def odom_callback(self, msg):
+    def odom_callback(self, msg): # Callback functions within the subscriber run continuously in order to update the relevant information
         self.odom_msg = msg
         self.odom_updated = True
-
-    def imu_callback(self, msg):
-        self.imu_msg = msg
-        self.imu_updated = True
-
-    def scan_callback(self, msg):
-        self.scan_msg = msg
-        self.scan_updated = True
 
     def lqr_loop(self, msg, i):
         global A, B, Xi, omega,n,x_hat,dt
